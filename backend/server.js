@@ -386,6 +386,16 @@ app.get("/api/orders", auth, (req, res) => {
   res.json(result);
 });
 
+app.delete("/api/orders/:orderId", auth, (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const order = db
+    .prepare("SELECT id FROM orders WHERE id = ? AND user_id = ?")
+    .get(orderId, req.user.id);
+  if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+  db.prepare("DELETE FROM orders WHERE id = ?").run(orderId);
+  res.json({ message: "Đã xóa đơn hàng" });
+});
+
 // 7. Newsletter
 app.post("/api/newsletter", (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();

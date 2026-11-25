@@ -779,6 +779,44 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  // Remove from wishlist modal
+  const wishRemove = e.target.closest("[data-wish-remove]");
+  if (wishRemove) {
+    const id = Number(wishRemove.dataset.wishRemove);
+    try {
+      const res = await apiFetch(`/wishlist/${id}`, { method: "POST" });
+      if (!res.wishlisted) {
+        state.wishlist.delete(id);
+        renderWishlist();
+        renderProducts();
+        toast("Đã bỏ khỏi yêu thích");
+      }
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    return;
+  }
+
+  // Cancel order
+  const orderCancel = e.target.closest("[data-order-cancel]");
+  if (orderCancel) {
+    const orderId = Number(orderCancel.dataset.orderCancel);
+    if (!confirm("Bạn có chắc muốn xóa đơn hàng này?")) return;
+    try {
+      await apiFetch(`/orders/${orderId}`, { method: "DELETE" });
+      toast("Đã xóa đơn hàng");
+      openOrders();
+      if ($("#accountModal").classList.contains("is-open")) {
+        $("#orderCount").textContent = (
+          await apiFetch("/orders")
+        ).length;
+      }
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    return;
+  }
+
   // Add to cart
   const add = e.target.closest("[data-add]");
   if (add) {
@@ -929,6 +967,9 @@ async function openOrders() {
   document.body.style.overflow = "hidden";
   try {
     const orders = await apiFetch("/orders");
+    if ($("#accountModal").classList.contains("is-open")) {
+      $("#orderCount").textContent = orders.length;
+    }
     if (!orders.length) {
       listEl.innerHTML = "<p>Bạn chưa có đơn hàng nào.</p>";
       return;
@@ -940,6 +981,7 @@ async function openOrders() {
         <div class="order-card__head">
           <strong>Đơn hàng #${o.id}</strong>
           <span class="order-status">${o.status}</span>
+          ${o.status === "pending" ? `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>` : ""}
         </div>
         <p class="order-card__addr">Giao tới: ${o.shipping_address} · ${new Date(o.created_at).toLocaleString("vi-VN")}</p>
         <div class="order-card__items">
@@ -967,6 +1009,77 @@ async function openOrders() {
 function closeOrders() {
   $("#ordersModal").classList.remove("is-open");
   $("#ordersOverlay").classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+
+/* ======== Wishlist ======== */
+function openWishlist() {
+  closeUserMenu();
+  renderWishlist();
+  $("#wishlistModal").classList.add("is-open");
+  $("#wishlistOverlay").classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+function closeWishlist() {
+  $("#wishlistModal").classList.remove("is-open");
+  $("#wishlistOverlay").classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+function renderWishlist() {
+  const listEl = $("#wishlistList");
+  const wished = products.filter((p) => state.wishlist.has(p.id));
+  if (!wished.length) {
+    listEl.innerHTML = `
+      <div class="empty-state" style="display:block;text-align:center;padding:40px 20px">
+        <svg class="icon icon--large"><use href="#i-heart"/></svg>
+        <h3>Chưa có sản phẩm yêu thích</h3>
+        <p>Nhấn vào tim trên sản phẩm để lưu lại nhé.</p>
+      </div>
+    `;
+    return;
+  }
+  listEl.innerHTML = wished
+    .map(
+      (p) => `
+    <div class="wishlist-item">
+      <img class="wishlist-item-img" src="${p.image}" alt="${p.name}" loading="lazy" />
+      <div class="wishlist-item-info">
+        <h3>${p.name}</h3>
+        <p>${p.brand} · ${formatPrice(p.price)}</p>
+      </div>
+      <button class="wishlist-remove" data-wish-remove="${p.id}" aria-label="Xóa ${p.name} khỏi yêu thích">
+        <svg class="icon"><use href="#i-close"/></svg>
+      </button>
+    </div>
+  `,
+    )
+    .join("");
+}
+
+/* ======== Account ======== */
+async function openAccount() {
+  closeUserMenu();
+  if (!currentUser) return;
+  $("#accountName").textContent = currentUser.name;
+  $("#accountEmail").textContent = currentUser.email;
+  $("#accountAvatar").textContent = currentUser.name.charAt(0).toUpperCase();
+  $("#wishlistCount").textContent = state.wishlist.size;
+  try {
+    const me = await apiFetch("/auth/me");
+    $("#accountMemberSince").textContent = new Date(me.created_at).toLocaleDateString("vi-VN");
+    const orders = await apiFetch("/orders");
+    $("#orderCount").textContent = orders.length;
+  } catch {
+    $("#accountMemberSince").textContent = "--";
+    $("#orderCount").textContent = "0";
+  }
+  $("#accountModal").classList.add("is-open");
+  $("#accountOverlay").classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+function closeAccount() {
+  $("#accountModal").classList.remove("is-open");
+  $("#accountOverlay").classList.remove("is-open");
   document.body.style.overflow = "";
 }
 
@@ -1010,22 +1123,29 @@ $("#myOrdersLink").addEventListener("click", (e) => {
 });
 $("#myWishlistLink").addEventListener("click", (e) => {
   e.preventDefault();
-  closeUserMenu();
-  const wished = products.filter((p) => state.wishlist.has(p.id));
-  if (!wished.length) {
-    toast("Bạn chưa có sản phẩm yêu thích nào");
-    return;
-  }
-  $("#products").scrollIntoView({ behavior: "smooth" });
-  toast(`Bạn đang có ${wished.length} sản phẩm yêu thích`);
+  openWishlist();
 });
 $("#myAccountLink").addEventListener("click", (e) => {
   e.preventDefault();
-  closeUserMenu();
-  if (currentUser) toast(`${currentUser.name} (${currentUser.email})`);
+  openAccount();
 });
 $("#closeOrders").addEventListener("click", closeOrders);
 $("#ordersOverlay").addEventListener("click", closeOrders);
+
+$("#closeWishlist").addEventListener("click", closeWishlist);
+$("#wishlistOverlay").addEventListener("click", closeWishlist);
+
+$("#closeAccount").addEventListener("click", closeAccount);
+$("#accountOverlay").addEventListener("click", closeAccount);
+
+$("#viewWishlistBtn").addEventListener("click", () => {
+  closeAccount();
+  openWishlist();
+});
+$("#viewOrdersBtn").addEventListener("click", () => {
+  closeAccount();
+  openOrders();
+});
 
 $("#newsletterBtn").addEventListener("click", async () => {
   const input = $("#newsletterEmail");
@@ -1093,6 +1213,8 @@ document.addEventListener("keydown", (e) => {
     closeCollections();
     closeCheckout();
     closeOrders();
+    closeWishlist();
+    closeAccount();
     closeUserMenu();
   }
 });

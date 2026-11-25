@@ -377,6 +377,51 @@
       </div>
     </div>
 
+    <!-- ======== WISHLIST MODAL ======== -->
+    <div class="modal-overlay" id="wishlistOverlay"></div>
+    <div class="collections-modal" id="wishlistModal" role="dialog" aria-modal="true" aria-label="Sản phẩm yêu thích">
+      <div class="collections-modal__inner">
+        <div class="collections-header">
+          <div>
+            <p class="eyebrow">YÊU THÍCH</p>
+            <h2>Sản phẩm yêu thích</h2>
+          </div>
+          <button class="close-btn" id="closeWishlist" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        </div>
+        <div id="wishlistList" class="wishlist-list"></div>
+      </div>
+    </div>
+
+    <!-- ======== ACCOUNT MODAL ======== -->
+    <div class="modal-overlay" id="accountOverlay"></div>
+    <div class="auth-modal" id="accountModal" role="dialog" aria-modal="true" aria-label="Thông tin tài khoản">
+      <div class="auth-modal__inner">
+        <button class="close-btn auth-close" id="closeAccount" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        <div class="account-info">
+          <div class="account-avatar" id="accountAvatar">H</div>
+          <div class="account-details">
+            <h2 id="accountName">User</h2>
+            <p id="accountEmail">user@email.com</p>
+            <p id="accountSince">Thành viên từ <strong id="accountMemberSince">--</strong></p>
+          </div>
+        </div>
+        <div class="account-stats">
+          <div class="account-stat">
+            <strong id="wishlistCount">0</strong>
+            <span>Sản phẩm yêu thích</span>
+          </div>
+          <div class="account-stat">
+            <strong id="orderCount">0</strong>
+            <span>Đơn hàng</span>
+          </div>
+        </div>
+        <div class="account-actions">
+          <button class="btn btn--outline btn--full" id="viewWishlistBtn">Xem sản phẩm yêu thích <svg class="icon"><use href="#i-heart"/></svg></button>
+          <button class="btn btn--dark btn--full" id="viewOrdersBtn">Xem đơn hàng <svg class="icon"><use href="#i-bag"/></svg></button>
+        </div>
+      </div>
+    </div>
+
     <!-- ======== TOAST ======== -->
     <div class="toast" id="toast" role="status">
       <span class="toast-check"><svg class="icon"><use href="#i-check" /></svg></span>
