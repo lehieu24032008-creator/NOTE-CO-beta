@@ -322,7 +322,10 @@ let authToken = localStorage.getItem("notecoToken") || null;
 let currentUser = JSON.parse(localStorage.getItem("notecoUser") || "null");
 
 async function apiFetch(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
@@ -552,7 +555,11 @@ async function handleLogin(e) {
       body: JSON.stringify({ email, password: pass }),
     });
     authToken = data.token;
-    currentUser = { id: data.user.id, name: data.user.full_name, email: data.user.email };
+    currentUser = {
+      id: data.user.id,
+      name: data.user.full_name,
+      email: data.user.email,
+    };
     localStorage.setItem("notecoToken", authToken);
     localStorage.setItem("notecoUser", JSON.stringify(currentUser));
     updateAuthUI();
@@ -594,7 +601,11 @@ async function handleRegister(e) {
       body: JSON.stringify({ full_name: name, email, password: pass }),
     });
     authToken = data.token;
-    currentUser = { id: data.user.id, name: data.user.full_name, email: data.user.email };
+    currentUser = {
+      id: data.user.id,
+      name: data.user.full_name,
+      email: data.user.email,
+    };
     localStorage.setItem("notecoToken", authToken);
     localStorage.setItem("notecoUser", JSON.stringify(currentUser));
     updateAuthUI();
@@ -808,7 +819,30 @@ document.addEventListener("click", async (e) => {
       openOrders();
       if ($("#accountModal").classList.contains("is-open")) {
         const orders = await apiFetch("/orders");
-        $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
+        $("#orderCount").textContent = orders.filter(
+          (o) => o.status !== "cancelled",
+        ).length;
+      }
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    return;
+  }
+
+  // Xóa vĩnh viễn đơn đã hủy
+  const orderDelete = e.target.closest("[data-order-delete]");
+  if (orderDelete) {
+    const orderId = Number(orderDelete.dataset.orderDelete);
+    if (!confirm("Bạn có chắc muốn xóa vĩnh viễn đơn hàng này?")) return;
+    try {
+      await apiFetch(`/orders/${orderId}/remove`, { method: "DELETE" });
+      toast("Đã xóa đơn hàng");
+      openOrders();
+      if ($("#accountModal").classList.contains("is-open")) {
+        const orders = await apiFetch("/orders");
+        $("#orderCount").textContent = orders.filter(
+          (o) => o.status !== "cancelled",
+        ).length;
       }
     } catch (err) {
       toast(err.message, "error");
@@ -967,7 +1001,9 @@ async function openOrders() {
   try {
     const orders = await apiFetch("/orders");
     if ($("#accountModal").classList.contains("is-open")) {
-      $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
+      $("#orderCount").textContent = orders.filter(
+        (o) => o.status !== "cancelled",
+      ).length;
     }
     if (!orders.length) {
       listEl.innerHTML = "<p>Bạn chưa có đơn hàng nào.</p>";
@@ -980,11 +1016,15 @@ async function openOrders() {
         <div class="order-card__head">
           <strong>Đơn hàng #${o.id}</strong>
           <span class="order-status order-status--${o.status}">${o.status}</span>
-          ${o.status === "pending"
-            ? o.payment_method === "momo"
-              ? `<a class="order-pay-again" href="/payment/qr?orderId=${o.id}" target="_blank" rel="noopener">Thanh toán</a> <button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
-              : `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
-            : ""}
+          ${
+            o.status === "pending"
+              ? o.payment_method === "momo"
+                ? `<a class="order-pay-again" href="/payment/qr?orderId=${o.id}" target="_blank" rel="noopener">Thanh toán</a> <button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
+                : `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
+              : o.status === "cancelled"
+                ? `<button class="order-delete" data-order-delete="${o.id}">Xóa</button>`
+                : ""
+            }
         </div>
         <p class="order-card__addr">Giao tới: ${o.shipping_address} · ${new Date(o.created_at).toLocaleString("vi-VN")}</p>
         <p class="order-card__payment">
@@ -1073,9 +1113,13 @@ async function openAccount() {
   $("#wishlistCount").textContent = state.wishlist.size;
   try {
     const me = await apiFetch("/auth/me");
-    $("#accountMemberSince").textContent = new Date(me.created_at).toLocaleDateString("vi-VN");
+    $("#accountMemberSince").textContent = new Date(
+      me.created_at,
+    ).toLocaleDateString("vi-VN");
     const orders = await apiFetch("/orders");
-    $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
+    $("#orderCount").textContent = orders.filter(
+      (o) => o.status !== "cancelled",
+    ).length;
   } catch {
     $("#accountMemberSince").textContent = "--";
     $("#orderCount").textContent = "0";
@@ -1107,7 +1151,9 @@ $("#checkoutForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const shipping_address = $("#shippingAddress").value.trim();
   const note = $("#orderNote").value.trim();
-  const payment_method = $("#checkoutForm").querySelector('input[name="paymentMethod"]:checked').value;
+  const payment_method = $("#checkoutForm").querySelector(
+    'input[name="paymentMethod"]:checked',
+  ).value;
   const errEl = $("#checkoutError");
   errEl.textContent = "";
   try {
@@ -1121,7 +1167,9 @@ $("#checkoutForm").addEventListener("submit", async (e) => {
     $("#checkoutForm").reset();
     if (res.payment_url) {
       window.open(res.payment_url, "_blank");
-      toast(`Đã tạo đơn hàng #${res.order_id}. Vui lòng hoàn tất thanh toán trên cửa sổ mới.`);
+      toast(
+        `Đã tạo đơn hàng #${res.order_id}. Vui lòng hoàn tất thanh toán trên cửa sổ mới.`,
+      );
     } else {
       toast(`Đặt hàng thành công! Mã đơn #${res.order_id} 🎉`);
     }

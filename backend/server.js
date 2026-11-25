@@ -555,6 +555,20 @@ app.delete("/api/orders/:orderId", auth, (req, res) => {
   res.json({ message: "Đã hủy đơn hàng", order_id: orderId, status: "cancelled" });
 });
 
+// Xóa vĩnh viễn đơn hàng đã hủy
+app.delete("/api/orders/:orderId/remove", auth, (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const order = db
+    .prepare("SELECT id, status FROM orders WHERE id = ? AND user_id = ?")
+    .get(orderId, req.user.id);
+  if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+  if (order.status !== "cancelled") {
+    return res.status(400).json({ message: "Chỉ có thể xóa đơn hàng đã bị hủy" });
+  }
+  db.prepare("DELETE FROM orders WHERE id = ?").run(orderId);
+  res.json({ message: "Đã xóa đơn hàng", order_id: orderId });
+});
+
 // 7. Newsletter
 app.post("/api/newsletter", (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
