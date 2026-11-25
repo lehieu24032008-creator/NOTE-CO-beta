@@ -42,9 +42,9 @@
               </div>
             </div>
             <div class="user-menu__links">
-              <a href="#"><svg class="icon"><use href="#i-bag"/></svg> Đơn hàng của tôi</a>
-              <a href="#"><svg class="icon"><use href="#i-heart"/></svg> Sản phẩm yêu thích</a>
-              <a href="#"><svg class="icon"><use href="#i-user"/></svg> Thông tin tài khoản</a>
+              <a href="#" id="myOrdersLink"><svg class="icon"><use href="#i-bag"/></svg> Đơn hàng của tôi</a>
+              <a href="#" id="myWishlistLink"><svg class="icon"><use href="#i-heart"/></svg> Sản phẩm yêu thích</a>
+              <a href="#" id="myAccountLink"><svg class="icon"><use href="#i-user"/></svg> Thông tin tài khoản</a>
             </div>
             <button class="user-menu__logout" id="logoutBtn">
               <svg class="icon"><use href="#i-close"/></svg> Đăng xuất
@@ -220,8 +220,8 @@
           <strong>Đăng ký nhận tin</strong>
           <p>Nhận ưu đãi và cảm hứng mới mỗi tuần.</p>
           <div class="newsletter">
-            <input placeholder="Email của bạn" type="email" />
-            <button aria-label="Đăng ký"><svg class="icon"><use href="#i-arrow" /></svg></button>
+            <input id="newsletterEmail" placeholder="Email của bạn" type="email" />
+            <button id="newsletterBtn" aria-label="Đăng ký"><svg class="icon"><use href="#i-arrow" /></svg></button>
           </div>
         </div>
       </div>
@@ -333,6 +333,47 @@
           <button class="close-btn" id="closeCollections" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
         </div>
         <div class="collections-grid" id="collectionsGrid"></div>
+      </div>
+    </div>
+
+    <!-- ======== CHECKOUT MODAL ======== -->
+    <div class="modal-overlay" id="checkoutOverlay"></div>
+    <div class="auth-modal" id="checkoutModal" role="dialog" aria-modal="true" aria-label="Đặt hàng">
+      <div class="auth-modal__inner">
+        <button class="close-btn auth-close" id="closeCheckout" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        <p class="eyebrow">NOTE&CO CHECKOUT</p>
+        <h2 style="margin:6px 0 16px">Xác nhận đặt hàng</h2>
+        <form id="checkoutForm">
+          <div class="form-group">
+            <label for="shippingAddress">Địa chỉ giao hàng</label>
+            <input type="text" id="shippingAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, TP..." required />
+          </div>
+          <div class="form-group">
+            <label for="orderNote">Ghi chú (không bắt buộc)</label>
+            <input type="text" id="orderNote" placeholder="Ví dụ: Giao giờ hành chính" />
+          </div>
+          <div class="checkout-total">
+            <span>Tổng thanh toán</span>
+            <strong id="checkoutTotal">0đ</strong>
+          </div>
+          <p class="form-error" id="checkoutError"></p>
+          <button type="submit" class="btn btn--dark btn--full">Đặt hàng ngay <svg class="icon"><use href="#i-arrow" /></svg></button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ======== ORDERS MODAL ======== -->
+    <div class="modal-overlay" id="ordersOverlay"></div>
+    <div class="collections-modal" id="ordersModal" role="dialog" aria-modal="true" aria-label="Đơn hàng của tôi">
+      <div class="collections-modal__inner">
+        <div class="collections-header">
+          <div>
+            <p class="eyebrow">LỊCH SỬ MUA HÀNG</p>
+            <h2>Đơn hàng của tôi</h2>
+          </div>
+          <button class="close-btn" id="closeOrders" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        </div>
+        <div id="ordersList" class="orders-list"></div>
       </div>
     </div>
 

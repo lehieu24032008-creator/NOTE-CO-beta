@@ -1,6 +1,9 @@
 /* ======== NOTE&CO — Script ======== */
 
-const products = [
+let products = [];
+let collections = [];
+
+const fallbackProducts = [
   // --- Bút viết ---
   {
     id: 1,
@@ -277,7 +280,7 @@ const products = [
 ];
 
 /* ======== Collections data ======== */
-const collections = [
+const fallbackCollections = [
   {
     id: "back-to-school",
     name: "Back to School 2026",
@@ -304,9 +307,43 @@ const collections = [
   },
 ];
 
-/* ======== State ======== */
-let state = { filter: "Tất cả", search: "", sort: "featured", cart: [] };
+/* ======== API & State ======== */
+const API_BASE =
+  window.location.protocol === "file:" ? "http://localhost:3000/api" : "/api";
+
+let state = {
+  filter: "Tất cả",
+  search: "",
+  sort: "featured",
+  cart: JSON.parse(localStorage.getItem("notecoGuestCart") || "[]"),
+  wishlist: new Set(),
+};
+let authToken = localStorage.getItem("notecoToken") || null;
 let currentUser = JSON.parse(localStorage.getItem("notecoUser") || "null");
+
+async function apiFetch(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401 && authToken) {
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem("notecoToken");
+      localStorage.removeItem("notecoUser");
+      updateAuthUI();
+    }
+    throw new Error(data.message || "Có lỗi xảy ra");
+  }
+  return data;
+}
+
+function saveGuestCart() {
+  if (!authToken) {
+    localStorage.setItem("notecoGuestCart", JSON.stringify(state.cart));
+  }
+}
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
@@ -329,7 +366,7 @@ function renderProducts() {
     <article class="product-card" style="animation-delay:${i * 60}ms">
       <div class="product-visual ${p.color}">
         ${p.tag ? `<span class="product-tag">${p.tag}</span>` : ""}
-        <button class="wish-btn" aria-label="Thêm ${p.name} vào yêu thích">
+        <button class="wish-btn ${state.wishlist.has(p.id) ? "is-active" : ""}" data-wish="${p.id}" aria-label="Thêm ${p.name} vào yêu thích">
           <svg class="icon"><use href="#i-heart"/></svg>
         </button>
         <img src="${p.image}" alt="${p.name}" loading="lazy" />
@@ -408,11 +445,27 @@ function toast(text, type = "success") {
   window.toastTimer = setTimeout(() => t.classList.remove("is-visible"), 2500);
 }
 
-function addToCart(id) {
+async function addToCart(id) {
   const p = products.find((x) => x.id === id);
+  if (!p) return;
+  if (authToken) {
+    try {
+      const res = await apiFetch("/cart", {
+        method: "POST",
+        body: JSON.stringify({ product_id: id, quantity: 1 }),
+      });
+      state.cart = res.items;
+      renderCart();
+      toast(`${p.name} đã được thêm vào giỏ`);
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    return;
+  }
   const found = state.cart.find((x) => x.id === id);
   if (found) found.qty++;
   else state.cart.push({ ...p, qty: 1 });
+  saveGuestCart();
   renderCart();
   toast(`${p.name} đã được thêm vào giỏ`);
 }
@@ -460,36 +513,65 @@ function switchAuthTab(tab) {
   );
 }
 
-function handleLogin(e) {
+async function syncUserSession() {
+  if (!authToken) return;
+  try {
+    if (state.cart.length > 0) {
+      state.cart = await apiFetch("/cart/sync", {
+        method: "POST",
+        body: JSON.stringify({
+          items: state.cart.map((i) => ({ product_id: i.id, quantity: i.qty })),
+        }),
+      });
+      localStorage.removeItem("notecoGuestCart");
+    } else {
+      state.cart = await apiFetch("/cart");
+    }
+    const wl = await apiFetch("/wishlist");
+    state.wishlist = new Set(wl.productIds || []);
+    renderCart();
+    renderProducts();
+  } catch (err) {
+    console.warn("Sync session failed:", err.message);
+  }
+}
+
+async function handleLogin(e) {
   e.preventDefault();
   const email = $("#loginEmail").value.trim();
   const pass = $("#loginPassword").value;
   const errEl = $("#loginError");
+  errEl.textContent = "";
   if (!email || !pass) {
     errEl.textContent = "Vui lòng nhập đầy đủ thông tin.";
     return;
   }
-  // Check localStorage users
-  const users = JSON.parse(localStorage.getItem("notecoUsers") || "[]");
-  const user = users.find((u) => u.email === email);
-  if (!user || user.password !== pass) {
-    errEl.textContent = "Email hoặc mật khẩu không đúng.";
-    return;
+  try {
+    const data = await apiFetch("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password: pass }),
+    });
+    authToken = data.token;
+    currentUser = { id: data.user.id, name: data.user.full_name, email: data.user.email };
+    localStorage.setItem("notecoToken", authToken);
+    localStorage.setItem("notecoUser", JSON.stringify(currentUser));
+    updateAuthUI();
+    closeAuth();
+    await syncUserSession();
+    toast(`Chào mừng trở lại, ${currentUser.name}! 👋`);
+  } catch (err) {
+    errEl.textContent = err.message;
   }
-  currentUser = { name: user.name, email: user.email };
-  localStorage.setItem("notecoUser", JSON.stringify(currentUser));
-  updateAuthUI();
-  closeAuth();
-  toast(`Chào mừng trở lại, ${currentUser.name}! 👋`);
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   e.preventDefault();
   const name = $("#regName").value.trim();
   const email = $("#regEmail").value.trim();
   const pass = $("#regPassword").value;
   const pass2 = $("#regPassword2").value;
   const errEl = $("#regError");
+  errEl.textContent = "";
   if (!name || !email || !pass || !pass2) {
     errEl.textContent = "Vui lòng nhập đầy đủ thông tin.";
     return;
@@ -506,24 +588,35 @@ function handleRegister(e) {
     errEl.textContent = "Mật khẩu xác nhận không khớp.";
     return;
   }
-  const users = JSON.parse(localStorage.getItem("notecoUsers") || "[]");
-  if (users.find((u) => u.email === email)) {
-    errEl.textContent = "Email đã được sử dụng.";
-    return;
+  try {
+    const data = await apiFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ full_name: name, email, password: pass }),
+    });
+    authToken = data.token;
+    currentUser = { id: data.user.id, name: data.user.full_name, email: data.user.email };
+    localStorage.setItem("notecoToken", authToken);
+    localStorage.setItem("notecoUser", JSON.stringify(currentUser));
+    updateAuthUI();
+    closeAuth();
+    await syncUserSession();
+    toast(`Đăng ký thành công! Chào ${name} 🎉`);
+  } catch (err) {
+    errEl.textContent = err.message;
   }
-  users.push({ name, email, password: pass });
-  localStorage.setItem("notecoUsers", JSON.stringify(users));
-  currentUser = { name, email };
-  localStorage.setItem("notecoUser", JSON.stringify(currentUser));
-  updateAuthUI();
-  closeAuth();
-  toast(`Đăng ký thành công! Chào ${name} 🎉`);
 }
 
 function logout() {
+  authToken = null;
   currentUser = null;
+  state.cart = [];
+  state.wishlist = new Set();
+  localStorage.removeItem("notecoToken");
   localStorage.removeItem("notecoUser");
+  localStorage.removeItem("notecoGuestCart");
   updateAuthUI();
+  renderCart();
+  renderProducts();
   closeUserMenu();
   toast("Đã đăng xuất thành công");
 }
@@ -627,7 +720,7 @@ function browseCollection(collectionId) {
     <article class="product-card" style="animation-delay:${i * 60}ms">
       <div class="product-visual ${p.color}">
         ${p.tag ? `<span class="product-tag">${p.tag}</span>` : ""}
-        <button class="wish-btn" aria-label="Thêm ${p.name} vào yêu thích">
+        <button class="wish-btn ${state.wishlist.has(p.id) ? "is-active" : ""}" data-wish="${p.id}" aria-label="Thêm ${p.name} vào yêu thích">
           <svg class="icon"><use href="#i-heart"/></svg>
         </button>
         <img src="${p.image}" alt="${p.name}" loading="lazy" />
@@ -664,7 +757,28 @@ function browseCollection(collectionId) {
 }
 
 /* ======== Events ======== */
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
+  // Wishlist toggle
+  const wish = e.target.closest("[data-wish]");
+  if (wish) {
+    const id = Number(wish.dataset.wish);
+    if (!authToken) {
+      toast("Vui lòng đăng nhập để lưu sản phẩm yêu thích", "error");
+      openAuth("login");
+      return;
+    }
+    try {
+      const res = await apiFetch(`/wishlist/${id}`, { method: "POST" });
+      if (res.wishlisted) state.wishlist.add(id);
+      else state.wishlist.delete(id);
+      wish.classList.toggle("is-active", res.wishlisted);
+      toast(res.wishlisted ? "Đã thêm vào yêu thích" : "Đã bỏ khỏi yêu thích");
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    return;
+  }
+
   // Add to cart
   const add = e.target.closest("[data-add]");
   if (add) {
@@ -693,9 +807,24 @@ document.addEventListener("click", (e) => {
   if (plus || minus) {
     const id = Number((plus || minus).dataset[plus ? "plus" : "minus"]);
     const item = state.cart.find((x) => x.id === id);
-    if (plus) item.qty++;
-    else item.qty--;
+    if (!item) return;
+    const nextQty = plus ? item.qty + 1 : item.qty - 1;
+    if (authToken) {
+      try {
+        const res = await apiFetch(`/cart/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ quantity: nextQty }),
+        });
+        state.cart = res.items;
+        renderCart();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+      return;
+    }
+    item.qty = nextQty;
     if (item.qty < 1) state.cart = state.cart.filter((x) => x.id !== id);
+    saveGuestCart();
     renderCart();
     return;
   }
@@ -777,9 +906,142 @@ $("#shopNow").addEventListener("click", () => {
   closeCart();
   $("#products").scrollIntoView({ behavior: "smooth" });
 });
-$("#checkoutBtn").addEventListener("click", () =>
-  toast("Demo: bước đặt hàng đang được mở rộng"),
-);
+function openCheckout() {
+  const total = state.cart.reduce((n, i) => n + i.price * i.qty, 0);
+  $("#checkoutTotal").textContent = formatPrice(total);
+  $("#checkoutError").textContent = "";
+  $("#checkoutModal").classList.add("is-open");
+  $("#checkoutOverlay").classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+function closeCheckout() {
+  $("#checkoutModal").classList.remove("is-open");
+  $("#checkoutOverlay").classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+
+async function openOrders() {
+  closeUserMenu();
+  const listEl = $("#ordersList");
+  listEl.innerHTML = "<p>Đang tải đơn hàng...</p>";
+  $("#ordersModal").classList.add("is-open");
+  $("#ordersOverlay").classList.add("is-open");
+  document.body.style.overflow = "hidden";
+  try {
+    const orders = await apiFetch("/orders");
+    if (!orders.length) {
+      listEl.innerHTML = "<p>Bạn chưa có đơn hàng nào.</p>";
+      return;
+    }
+    listEl.innerHTML = orders
+      .map(
+        (o) => `
+      <div class="order-card">
+        <div class="order-card__head">
+          <strong>Đơn hàng #${o.id}</strong>
+          <span class="order-status">${o.status}</span>
+        </div>
+        <p class="order-card__addr">Giao tới: ${o.shipping_address} · ${new Date(o.created_at).toLocaleString("vi-VN")}</p>
+        <div class="order-card__items">
+          ${o.items
+            .map(
+              (i) => `
+            <div class="order-card__item">
+              <span>${i.name} × ${i.quantity}</span>
+              <strong>${formatPrice(i.unit_price * i.quantity)}</strong>
+            </div>`,
+            )
+            .join("")}
+          <div class="order-card__item" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(20,20,20,0.08)">
+            <strong>Tổng cộng</strong>
+            <strong>${formatPrice(o.total_amount)}</strong>
+          </div>
+        </div>
+      </div>`,
+      )
+      .join("");
+  } catch (err) {
+    listEl.innerHTML = `<p class="form-error">${err.message}</p>`;
+  }
+}
+function closeOrders() {
+  $("#ordersModal").classList.remove("is-open");
+  $("#ordersOverlay").classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+
+$("#checkoutBtn").addEventListener("click", () => {
+  if (!state.cart.length) return;
+  if (!authToken) {
+    closeCart();
+    openAuth("login");
+    toast("Vui lòng đăng nhập để đặt hàng", "error");
+    return;
+  }
+  closeCart();
+  openCheckout();
+});
+$("#closeCheckout").addEventListener("click", closeCheckout);
+$("#checkoutOverlay").addEventListener("click", closeCheckout);
+$("#checkoutForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const shipping_address = $("#shippingAddress").value.trim();
+  const note = $("#orderNote").value.trim();
+  const errEl = $("#checkoutError");
+  errEl.textContent = "";
+  try {
+    const res = await apiFetch("/orders/checkout", {
+      method: "POST",
+      body: JSON.stringify({ shipping_address, note }),
+    });
+    state.cart = [];
+    renderCart();
+    closeCheckout();
+    $("#checkoutForm").reset();
+    toast(`Đặt hàng thành công! Mã đơn #${res.order_id} 🎉`);
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+$("#myOrdersLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  openOrders();
+});
+$("#myWishlistLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  closeUserMenu();
+  const wished = products.filter((p) => state.wishlist.has(p.id));
+  if (!wished.length) {
+    toast("Bạn chưa có sản phẩm yêu thích nào");
+    return;
+  }
+  $("#products").scrollIntoView({ behavior: "smooth" });
+  toast(`Bạn đang có ${wished.length} sản phẩm yêu thích`);
+});
+$("#myAccountLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  closeUserMenu();
+  if (currentUser) toast(`${currentUser.name} (${currentUser.email})`);
+});
+$("#closeOrders").addEventListener("click", closeOrders);
+$("#ordersOverlay").addEventListener("click", closeOrders);
+
+$("#newsletterBtn").addEventListener("click", async () => {
+  const input = $("#newsletterEmail");
+  const email = input.value.trim();
+  if (!email) return toast("Vui lòng nhập email", "error");
+  try {
+    const res = await apiFetch("/newsletter", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    input.value = "";
+    toast(res.message);
+  } catch (err) {
+    toast(err.message, "error");
+  }
+});
 
 // Quick view
 $("#closeQuick").addEventListener("click", closeQuick);
@@ -829,6 +1091,8 @@ document.addEventListener("keydown", (e) => {
     closeQuick();
     closeAuth();
     closeCollections();
+    closeCheckout();
+    closeOrders();
     closeUserMenu();
   }
 });
@@ -856,6 +1120,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ======== Init ======== */
-renderProducts();
-renderCart();
-updateAuthUI();
+async function initApp() {
+  try {
+    const [prodData, colData] = await Promise.all([
+      apiFetch("/products"),
+      apiFetch("/collections"),
+    ]);
+    products = prodData;
+    collections = colData;
+  } catch {
+    products = fallbackProducts;
+    collections = fallbackCollections;
+  }
+  updateAuthUI();
+  renderProducts();
+  renderCart();
+  if (authToken) {
+    await syncUserSession();
+  }
+}
+
+initApp();
