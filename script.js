@@ -1031,6 +1031,30 @@ async function openOrders() {
           <span>Thanh toán: ${o.payment_method === "momo" ? "MoMo online" : "Tiền mặt khi nhận hàng (COD)"}</span>
           <span class="order-payment-status order-payment-status--${o.status === "paid" ? "paid" : "unpaid"}">${o.status === "paid" ? "Đã thanh toán" : o.payment_method === "momo" ? "Chưa thanh toán" : "Thanh toán khi nhận hàng"}</span>
         </p>
+        ${o.status !== "cancelled" ? `
+        <div class="order-tracking">
+          <p class="order-tracking__title">Theo dõi đơn hàng</p>
+          <div class="order-tracking__steps">
+            <div class="order-tracking__step ${o.status === "paid" || o.status === "shipping" || o.status === "completed" ? "active" : ""}" data-step="1">
+              <span class="order-tracking__step-dot"></span>
+              <span class="order-tracking__step-label">Xác nhận đơn</span>
+            </div>
+            <div class="order-tracking__step ${o.status === "shipping" || o.status === "completed" ? "active" : ""}" data-step="2">
+              <span class="order-tracking__step-dot"></span>
+              <span class="order-tracking__step-label">Đã lấy đơn</span>
+            </div>
+            <div class="order-tracking__step ${o.status === "shipping" ? "active" : o.status === "completed" ? "done" : ""}" data-step="3">
+              <span class="order-tracking__step-dot"></span>
+              <span class="order-tracking__step-label">Đang giao hàng</span>
+            </div>
+            <div class="order-tracking__step ${o.status === "completed" ? "active done" : ""}" data-step="4">
+              <span class="order-tracking__step-dot"></span>
+              <span class="order-tracking__step-label">Đã giao hàng</span>
+            </div>
+          </div>
+          <a class="order-tracking__link" href="/tracking?orderId=${o.id}" target="_blank" rel="noopener">Xem chi tiết theo dõi <svg class="icon"><use href="#i-arrow" /></svg></a>
+        </div>
+        ` : ""}
         <div class="order-card__items">
           ${o.items
             .map(

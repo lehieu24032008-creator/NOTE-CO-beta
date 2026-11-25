@@ -569,6 +569,118 @@ app.delete("/api/orders/:orderId/remove", auth, (req, res) => {
   res.json({ message: "Đã xóa đơn hàng", order_id: orderId });
 });
 
+// Trang theo dõi đơn hàng
+app.get("/tracking", (req, res) => {
+  const { orderId } = req.query;
+  const order = orderId ? db.prepare("SELECT * FROM orders WHERE id = ?").get(Number(orderId)) : null;
+  if (!order) {
+    res.send("<h1>Không tìm thấy đơn hàng</h1><a href='/'>Về trang chủ</a>");
+    return;
+  }
+  const items = db.prepare(
+    `SELECT oi.product_id, oi.quantity, oi.unit_price, p.name, p.brand, p.image_url
+     FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     WHERE oi.order_id = ?`,
+  ).all(Number(orderId));
+  const stepLabels = {
+    1: "Xác nhận đơn",
+    2: "Đã lấy đơn",
+    3: "Đang giao hàng",
+    4: "Đã giao hàng",
+  };
+  let currentStep = 1;
+  if (order.status === "paid") currentStep = 1;
+  if (order.status === "shipping") currentStep = 3;
+  if (order.status === "completed") currentStep = 4;
+  res.send(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Theo dõi đơn hàng #${order.id} — NOTE&CO</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#fbfaf7;color:#18211f;font-family:'DM Sans',sans-serif}
+    .page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+    .card{background:#fff;border-radius:16px;padding:32px;box-shadow:0 20px 60px rgba(24,33,31,0.14);text-align:center;max-width:480px;width:100%}
+    .brand{font:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:28px;letter-spacing:-0.04em;margin-bottom:8px}
+    .brand span{color:#ef5d3b}
+    .subtitle{color:#69716f;font-size:13px;margin-bottom:24px}
+    .order-id{font:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;color:#18211f;margin-bottom:20px}
+    .steps{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;position:relative}
+    .steps::before{content:"";position:absolute;top:14px;left:0;right:0;height:2px;background:#e4e8e6;z-index:0}
+    .step{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;flex:1;cursor:pointer}
+    .step-dot{width:12px;height:12px;border-radius:50%;background:#e4e8e6;border:2px solid #e4e8e6;margin-bottom:6px;transition:all 0.15s}
+    .step-label{font-size:11px;color:#aab3ae;white-space:nowrap;transition:color 0.15s}
+    .step.active .step-dot{background:var(--accent,#4a8db7);border-color:var(--accent,#4a8db7)}
+    .step.active .step-label{color:var(--accent,#4a8db7);font-weight:600}
+    .step.done .step-dot{background:#6caa88;border-color:#6caa88}
+    .step.done .step-label{color:#6caa88;font-weight:600}
+    .items{text-align:left;margin-bottom:20px}
+    .item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+    .item img{width:40px;height:40px;border-radius:6px;object-fit:cover;margin-right:10px}
+    .item-info{flex:1}
+    .item-name{font-weight:600;color:var(--ink)}
+    .item-qty{font-size:11px;color:#aab3ae}
+    .total{font:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:18px;color:var(--ink);margin-top:8px}
+    .status-badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:600;text-transform:uppercase;margin-top:12px}
+    .status-badge--pending{background:#eef3f7;color:#4a8db7}
+    .status-badge--paid{background:#e7f0e7;color:#6caa88}
+    .status-badge--shipping{background:#fff4e0;color:#c97856}
+    .status-badge--completed{background:#e7f0e7;color:#6caa88}
+    .status-badge--cancelled{background:#fdeaea;color:#d44}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#18211f;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-weight:700;font-size:13px;text-decoration:none;margin-top:16px}
+    .btn:hover{background:#34403c}
+    .note{font-size:11px;color:#aab3ae;margin-top:16px}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="brand">NOTE<span class="brand"> &</span>CO</div>
+      <div class="subtitle">Theo dõi đơn hàng</div>
+      <div class="order-id">Đơn hàng #${order.id}</div>
+      <div class="steps">
+        <div class="step ${currentStep >= 1 ? "active" : ""}">
+          <span class="step-dot"></span>
+          <span class="step-label">Xác nhận đơn</span>
+        </div>
+        <div class="step ${currentStep >= 2 ? "active done" : ""}">
+          <span class="step-dot"></span>
+          <span class="step-label">Đã lấy đơn</span>
+        </div>
+        <div class="step ${currentStep >= 3 ? "active done" : ""}">
+          <span class="step-dot"></span>
+          <span class="step-label">Đang giao hàng</span>
+        </div>
+        <div class="step ${currentStep >= 4 ? "active done" : ""}">
+          <span class="step-dot"></span>
+          <span class="step-label">Đã giao hàng</span>
+        </div>
+      </div>
+      <div class="status-badge status-badge--${order.status}">${order.status}</div>
+      <div class="items">
+        ${items.map(i => `
+          <div class="item">
+            <img src="${i.image_url || ''}" alt="${i.name}" />
+            <div class="item-info">
+              <div class="item-name">${i.name} × ${i.quantity}</div>
+              <div class="item-qty">${i.brand} · ${Number(i.unit_price).toLocaleString("vi-VN")}đ</div>
+            </div>
+            <strong>${Number(i.unit_price * i.quantity).toLocaleString("vi-VN")}đ</strong>
+          </div>
+        `).join("")}
+        <div class="total">Tổng: ${Number(order.total_amount).toLocaleString("vi-VN")}đ</div>
+      </div>
+      <p class="note">Địa chỉ giao: ${order.shipping_address}</p>
+      <a href="/" class="btn">Về trang chủ</a>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
 // 7. Newsletter
 app.post("/api/newsletter", (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();

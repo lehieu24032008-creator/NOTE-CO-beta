@@ -2515,6 +2515,93 @@ a {
 .order-payment-status--paid { background: #e7f0e7; color: #6caa88; }
 .order-payment-status--unpaid { background: #fdeaea; color: #d44; }
 
+/* Order tracking steps */
+.order-tracking {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.order-tracking__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+.order-tracking__steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  position: relative;
+}
+.order-tracking__steps::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e4e8e6;
+  z-index: 0;
+}
+.order-tracking__step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.order-tracking__step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e4e8e6;
+  border: 2px solid #e4e8e6;
+  margin-bottom: 4px;
+  transition: all 0.15s;
+}
+.order-tracking__step-label {
+  font-size: 10px;
+  color: #aab3ae;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.order-tracking__step.active .order-tracking__step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.order-tracking__step.active .order-tracking__step-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+.order-tracking__step.done .order-tracking__step-dot {
+  background: #6caa88;
+  border-color: #6caa88;
+}
+.order-tracking__step.done .order-tracking__step-label {
+  color: #6caa88;
+  font-weight: 600;
+}
+.order-tracking__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #ef5d3b;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.order-tracking__link:hover {
+  color: #d94848;
+  text-decoration: underline;
+}
+.order-tracking__link .icon {
+  width: 12px;
+}
+
 /* Nút thanh toán lại cho đơn MoMo chưa thanh toán */
 .order-pay-again {
   display: inline-flex;
