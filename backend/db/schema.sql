@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS orders (
   status ENUM('pending', 'paid', 'shipping', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
   shipping_address VARCHAR(500) NOT NULL,
   note VARCHAR(500) NOT NULL DEFAULT '',
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'cod',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );

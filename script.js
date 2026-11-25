@@ -807,9 +807,8 @@ document.addEventListener("click", async (e) => {
       toast("Đã xóa đơn hàng");
       openOrders();
       if ($("#accountModal").classList.contains("is-open")) {
-        $("#orderCount").textContent = (
-          await apiFetch("/orders")
-        ).length;
+        const orders = await apiFetch("/orders");
+        $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
       }
     } catch (err) {
       toast(err.message, "error");
@@ -968,7 +967,7 @@ async function openOrders() {
   try {
     const orders = await apiFetch("/orders");
     if ($("#accountModal").classList.contains("is-open")) {
-      $("#orderCount").textContent = orders.length;
+      $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
     }
     if (!orders.length) {
       listEl.innerHTML = "<p>Bạn chưa có đơn hàng nào.</p>";
@@ -980,10 +979,18 @@ async function openOrders() {
       <div class="order-card">
         <div class="order-card__head">
           <strong>Đơn hàng #${o.id}</strong>
-          <span class="order-status">${o.status}</span>
-          ${o.status === "pending" ? `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>` : ""}
+          <span class="order-status order-status--${o.status}">${o.status}</span>
+          ${o.status === "pending"
+            ? o.payment_method === "momo"
+              ? `<a class="order-pay-again" href="/payment/qr?orderId=${o.id}" target="_blank" rel="noopener">Thanh toán</a> <button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
+              : `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
+            : ""}
         </div>
         <p class="order-card__addr">Giao tới: ${o.shipping_address} · ${new Date(o.created_at).toLocaleString("vi-VN")}</p>
+        <p class="order-card__payment">
+          <span>Thanh toán: ${o.payment_method === "momo" ? "MoMo online" : "Tiền mặt khi nhận hàng (COD)"}</span>
+          <span class="order-payment-status order-payment-status--${o.status === "paid" ? "paid" : "unpaid"}">${o.status === "paid" ? "Đã thanh toán" : o.payment_method === "momo" ? "Chưa thanh toán" : "Thanh toán khi nhận hàng"}</span>
+        </p>
         <div class="order-card__items">
           ${o.items
             .map(
@@ -1068,7 +1075,7 @@ async function openAccount() {
     const me = await apiFetch("/auth/me");
     $("#accountMemberSince").textContent = new Date(me.created_at).toLocaleDateString("vi-VN");
     const orders = await apiFetch("/orders");
-    $("#orderCount").textContent = orders.length;
+    $("#orderCount").textContent = orders.filter((o) => o.status !== "cancelled").length;
   } catch {
     $("#accountMemberSince").textContent = "--";
     $("#orderCount").textContent = "0";
@@ -1100,18 +1107,24 @@ $("#checkoutForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const shipping_address = $("#shippingAddress").value.trim();
   const note = $("#orderNote").value.trim();
+  const payment_method = $("#checkoutForm").querySelector('input[name="paymentMethod"]:checked').value;
   const errEl = $("#checkoutError");
   errEl.textContent = "";
   try {
     const res = await apiFetch("/orders/checkout", {
       method: "POST",
-      body: JSON.stringify({ shipping_address, note }),
+      body: JSON.stringify({ shipping_address, note, payment_method }),
     });
     state.cart = [];
     renderCart();
     closeCheckout();
     $("#checkoutForm").reset();
-    toast(`Đặt hàng thành công! Mã đơn #${res.order_id} 🎉`);
+    if (res.payment_url) {
+      window.open(res.payment_url, "_blank");
+      toast(`Đã tạo đơn hàng #${res.order_id}. Vui lòng hoàn tất thanh toán trên cửa sổ mới.`);
+    } else {
+      toast(`Đặt hàng thành công! Mã đơn #${res.order_id} 🎉`);
+    }
   } catch (err) {
     errEl.textContent = err.message;
   }

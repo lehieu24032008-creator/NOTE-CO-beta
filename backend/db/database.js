@@ -78,6 +78,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'shipping', 'completed', 'cancelled')),
     shipping_address TEXT NOT NULL,
     note TEXT NOT NULL DEFAULT '',
+    payment_method TEXT NOT NULL DEFAULT 'cod',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
@@ -98,6 +99,13 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migration: add payment_method column for existing databases
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cod'");
+} catch {
+  // Column already exists, ignore
+}
 
 const seedProducts = [
   { id: 1, name: "Bút gel Sarasa Clip 0.5mm", brand: "ZEBRA", category: "Bút viết", price: 32000, unit: "/ cây", tag: "Bán chạy", color: "visual-blue", stock: 120, image_url: "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=700&q=80" },

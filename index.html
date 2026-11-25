@@ -352,12 +352,27 @@
             <label for="orderNote">Ghi chú (không bắt buộc)</label>
             <input type="text" id="orderNote" placeholder="Ví dụ: Giao giờ hành chính" />
           </div>
+          <div class="form-group">
+            <label>Phương thức thanh toán</label>
+            <div class="payment-methods">
+              <label class="payment-option">
+                <input type="radio" name="paymentMethod" value="cod" checked />
+                <span class="payment-option__mark"></span>
+                <span class="payment-option__label">Thanh toán khi nhận hàng (COD)</span>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="paymentMethod" value="momo" />
+                <span class="payment-option__mark"></span>
+                <span class="payment-option__label">Thanh toán online (MoMo)</span>
+              </label>
+            </div>
+          </div>
           <div class="checkout-total">
             <span>Tổng thanh toán</span>
             <strong id="checkoutTotal">0đ</strong>
           </div>
           <p class="form-error" id="checkoutError"></p>
-          <button type="submit" class="btn btn--dark btn--full">Đặt hàng ngay <svg class="icon"><use href="#i-arrow" /></svg></button>
+          <button type="submit" class="btn btn--dark btn--full" id="checkoutSubmit">Đặt hàng ngay <svg class="icon"><use href="#i-arrow" /></svg></button>
         </form>
       </div>
     </div>
