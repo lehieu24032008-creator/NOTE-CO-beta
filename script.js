@@ -1145,15 +1145,20 @@ $(".wallet-tabs").addEventListener("click", (e) => { const tab = e.target.closes
 $("#spinBtn").addEventListener("click", async () => {
   const btn = $("#spinBtn");
   const wheel = $("#spinWheel");
+  const pointer = $("#spinPointer");
   const frame = $("#spinFrame");
   const progress = $("#spinProgress");
   const result = $("#spinResult");
   if (walletData.coins < 50) { toast("Không đủ xu để quay", "error"); return; }
+
+  const originalBtnHtml = btn.innerHTML;
   btn.disabled = true;
-  result.textContent = "Đã trừ 50 xu · Đang quay...";
+  btn.textContent = "Đang quay vòng xoay...";
+  wheel.querySelectorAll(".spin-slice").forEach((el) => el.classList.remove("is-winner"));
+  result.textContent = "Đã trừ 50 xu · Chúc bạn may mắn!";
   result.className = "wallet-result";
-  frame.classList.add("is-active");
-  frame.classList.add("spin-frame--deducting");
+  frame.classList.remove("spin-frame--adding");
+  frame.classList.add("is-active", "spin-frame--deducting");
   progress.style.width = "0%";
 
   const balanceBefore = walletData.coins;
@@ -1172,16 +1177,32 @@ $("#spinBtn").addEventListener("click", async () => {
     // Fallback keeps the animation alive when an older backend is still running.
     const prizeIndex = Number.isInteger(res.prize_index) ? res.prize_index : Math.floor(Math.random() * 5);
     const segmentCenter = 36 + (prizeIndex * 72);
+    const jitter = (Math.random() - 0.5) * 32; // ±16° inside the 72° slice for organic stops
     const currentAngle = ((spinRotation % 360) + 360) % 360;
-    const correction = (360 - segmentCenter - currentAngle + 360) % 360;
+    const correction = (360 - (segmentCenter + jitter) - currentAngle + 360) % 360;
     spinRotation += 2520 + correction;
 
     const spinDuration = 4600;
     const start = performance.now();
+    let lastSector = -1;
+    let tickTimer = null;
     const runProgress = () => {
       const now = performance.now();
       const p = Math.min(1, (now - start) / spinDuration);
       progress.style.width = (p * 100) + "%";
+
+      if (pointer) {
+        const matrix = new DOMMatrix(getComputedStyle(wheel).transform);
+        const angle = ((Math.atan2(matrix.b, matrix.a) * 180) / Math.PI + 360) % 360;
+        const sector = Math.floor(angle / 72);
+        if (lastSector !== -1 && sector !== lastSector) {
+          pointer.classList.add("is-ticking");
+          clearTimeout(tickTimer);
+          tickTimer = setTimeout(() => pointer.classList.remove("is-ticking"), 75);
+        }
+        lastSector = sector;
+      }
+
       if (p < 1) requestAnimationFrame(runProgress);
     };
     requestAnimationFrame(runProgress);
@@ -1193,17 +1214,23 @@ $("#spinBtn").addEventListener("click", async () => {
       if (finished) return;
       finished = true;
       progress.style.width = "100%";
-      frame.classList.remove("is-active");
-      frame.classList.remove("spin-frame--deducting");
+      if (pointer) pointer.classList.remove("is-ticking");
+      frame.classList.remove("is-active", "spin-frame--deducting");
+
+      const winningSlice = wheel.querySelectorAll(".spin-slice")[prizeIndex];
+      if (winningSlice) winningSlice.classList.add("is-winner");
+
       const isDouble = prizeIndex === 2;
+      const isJackpot = prizeIndex === 3;
       const isMiss = prizeIndex === 4;
       const stopLabel = isDouble
-        ? "+50 xu đã hoàn lại"
+        ? "Trúng x2 lượt sau · +50 xu hoàn lại"
         : isMiss
           ? "Chúc bạn may mắn lần sau"
           : prizeLabels[prizeIndex] + " đã cộng";
-      $("#spinResult").textContent = stopLabel;
-      result.className = "wallet-result is-success";
+      result.textContent = stopLabel;
+      result.className = "wallet-result " + (isMiss ? "is-miss" : isJackpot || isDouble ? "is-jackpot" : "is-success");
+
       try {
         const completed = await apiFetch("/wallet/spin/complete", {
           method: "POST",
@@ -1216,20 +1243,21 @@ $("#spinBtn").addEventListener("click", async () => {
         const finalCoins = Number.isFinite(completed.coins) ? completed.coins : walletData.coins + rewardCoins;
         if (rewardCoins > 0) {
           frame.classList.add("spin-frame--adding");
-          setTimeout(() => frame.classList.remove("spin-frame--adding"), 1500);
+          setTimeout(() => frame.classList.remove("spin-frame--adding"), 1800);
           showWalletDelta("+" + rewardCoins + " xu", rewardCoins);
         }
         animateWalletBalance(walletData.coins, finalCoins, stopLabel, rewardCoins);
         walletData.coins = finalCoins;
         updateWalletBalance(finalCoins);
-        $("#spinResult").textContent = stopLabel + " · Số dư: " + finalCoins + " xu";
+        result.textContent = stopLabel + " · Số dư: " + finalCoins.toLocaleString("vi-VN") + " xu";
       } catch (completeErr) {
         toast(completeErr.message, "error");
         const fallbackCoins = walletData.coins;
-        $("#spinResult").textContent = stopLabel + " · Số dư: " + fallbackCoins + " xu";
+        result.textContent = stopLabel + " · Số dư: " + fallbackCoins.toLocaleString("vi-VN") + " xu";
         await loadWallet().catch(() => {});
       } finally {
         btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
       }
     };
     wheel.addEventListener("transitionend", (event) => {
@@ -1239,8 +1267,9 @@ $("#spinBtn").addEventListener("click", async () => {
   } catch (err) {
     toast(err.message, "error");
     btn.disabled = false;
-    frame.classList.remove("is-active");
-    frame.classList.remove("spin-frame--deducting");
+    btn.innerHTML = originalBtnHtml;
+    if (pointer) pointer.classList.remove("is-ticking");
+    frame.classList.remove("is-active", "spin-frame--deducting");
     await loadWallet().catch(() => {});
   }
 });

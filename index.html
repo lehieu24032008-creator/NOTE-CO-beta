@@ -471,11 +471,32 @@
         </div>
         <div class="wallet-tabs"><button class="wallet-tab is-active" data-wallet-tab="spin">Vòng xoay</button><button class="wallet-tab" data-wallet-tab="vouchers">Đổi voucher</button><button class="wallet-tab" data-wallet-tab="history">Lịch sử</button></div>
         <section class="wallet-panel is-active" id="walletSpinPanel">
-          <div class="spin-stage"><div class="spin-pointer">▼</div><div class="spin-frame" id="spinFrame"></div><div class="spin-wheel" id="spinWheel"><span>+10 xu</span><span>+25 xu</span><span>x2 xu</span><span>+100 xu</span><span>Chúc bạn<br />may mắn<br />lần sau</span></div></div>
-          <p class="wallet-helper">Mỗi lượt quay dùng 50 xu. Phần thưởng được cộng/trừ ngay trong ví.</p>
+          <div class="spin-stage">
+            <div class="spin-pointer" id="spinPointer" aria-hidden="true">
+              <svg viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 42C18 42 33 25.5 33 15.5C33 7.49187 26.2843 1 18 1C9.71573 1 3 7.49187 3 15.5C3 25.5 18 42 18 42Z" fill="#ef5d3b" stroke="#ffffff" stroke-width="2.5"/>
+                <circle cx="18" cy="15.5" r="5" fill="#ffffff"/>
+              </svg>
+            </div>
+            <div class="spin-frame" id="spinFrame"></div>
+            <div class="spin-bezel">
+              <div class="spin-wheel" id="spinWheel">
+                <span class="spin-slice"><b>+10</b><small>xu</small></span>
+                <span class="spin-slice"><b>+25</b><small>xu</small></span>
+                <span class="spin-slice"><b>x2</b><small>lượt sau</small></span>
+                <span class="spin-slice"><b>+100</b><small>xu</small></span>
+                <span class="spin-slice spin-slice--miss"><small>Chúc bạn<br />may mắn</small></span>
+              </div>
+              <div class="spin-pegs" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+            <div class="spin-hub" aria-hidden="true"><span>✦</span></div>
+          </div>
+          <p class="wallet-helper">Mỗi lượt quay dùng <strong>50 xu</strong>. Phần thưởng được cộng trực tiếp vào ví.</p>
           <div class="spin-progress-wrap"><div class="spin-progress" id="spinProgress"></div></div>
           <button class="btn btn--dark btn--full" id="spinBtn">Quay với 50 xu <svg class="icon"><use href="#i-arrow"/></svg></button>
-          <p class="wallet-result" id="spinResult"></p>
+          <p class="wallet-result" id="spinResult" aria-live="polite"></p>
         </section>
         <section class="wallet-panel" id="walletVouchersPanel"><div class="voucher-grid" id="voucherGrid"></div><div class="my-vouchers" id="myVouchers"></div></section>
         <section class="wallet-panel" id="walletHistoryPanel"><div class="wallet-history" id="walletHistory"></div></section>
