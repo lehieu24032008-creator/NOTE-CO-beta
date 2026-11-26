@@ -4,10 +4,11 @@ import jwt from "jsonwebtoken";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import "dotenv/config";
+import dotenv from "dotenv";
 import db from "./db/database.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 const rootDir = path.resolve(__dirname, "..");
 const JWT_SECRET = process.env.JWT_SECRET || "note_and_co_secret_key_2026";
 const PORT = Number(process.env.PORT || 3000);
@@ -313,7 +314,7 @@ app.post("/api/orders/checkout", auth, (req, res) => {
   if (!shippingAddress) {
     return res.status(400).json({ message: "Vui lòng nhập địa chỉ giao hàng" });
   }
-  if (paymentMethod !== "cod" && paymentMethod !== "momo") {
+  if (paymentMethod !== "cod" && paymentMethod !== "online") {
     return res.status(400).json({ message: "Phương thức thanh toán không hợp lệ" });
   }
 
@@ -365,7 +366,7 @@ app.post("/api/orders/checkout", auth, (req, res) => {
 
       // Nếu thanh toán online, chuyển hướng đến trang QR thanh toán của cửa hàng
       let paymentUrl = null;
-      if (paymentMethod === "momo") {
+      if (paymentMethod === "online") {
         paymentUrl = `${process.env.BASE_URL || "http://localhost:3000"}/payment/qr?orderId=${orderId}`;
       }
 
@@ -377,39 +378,78 @@ app.post("/api/orders/checkout", auth, (req, res) => {
     res.status(err.status || 500).json({ message: err.message || "Lỗi khi tạo đơn hàng" });
   }
 });
-
-// Webhook / IPN từ cổng thanh toán (MoMo/VNPay...)
-app.post("/api/payment/webhook", (req, res) => {
-  // Trong môi trường production, cần xác thực chữ ký (signature/checksum) từ cổng thanh toán
-  // Ở đây mô phỏng: nhận order_id và status từ body
-  const { orderId, status, signature } = req.body;
-
-  if (!orderId || !status) {
-    return res.status(400).json({ message: "Thiếu thông tin webhook" });
-  }
-
-  const order = db.prepare("SELECT id, status FROM orders WHERE id = ?").get(Number(orderId));
-  if (!order) {
-    return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-  }
-
-  // Chỉ cập nhật nếu đơn đang pending và status webhook là paid
-  if (order.status === "pending" && status === "paid") {
-    db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(Number(orderId));
-    return res.json({ message: "Cập nhật trạng thái thanh toán thành công", order_id: Number(orderId), status: "paid" });
-  }
-
-  res.json({ message: "Không có thay đổi trạng thái", order_id: Number(orderId), current_status: order.status });
+// API cho trang QR tự động kiểm tra trạng thái thanh toán (Polling mỗi 3 giây)
+app.get("/api/payment/status/:orderId", (req, res) => {
+  const order = db
+    .prepare("SELECT id, status, total_amount, note FROM orders WHERE id = ?")
+    .get(Number(req.params.orderId));
+  if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+  res.json(order);
 });
 
-// Trang hiển thị mã QR thanh toán MoMo (thay vì redirect sang cổng bên ngoài)
+// Webhook nhận biến động số dư từ ngân hàng / cổng đối soát (SePay, Casso, PayOS...)
+app.post("/api/payment/webhook", (req, res) => {
+  const webhookSecret = process.env.WEBHOOK_SECRET || "noteco_webhook_secret_2026";
+  const authHeader = req.headers["authorization"] || "";
+  const sepayKey = authHeader.startsWith("Apikey ") ? authHeader.slice(7).trim() : "";
+  const incomingSecret = req.headers["x-webhook-secret"] || req.body.secret || sepayKey;
+
+  if (incomingSecret !== webhookSecret) {
+    return res.status(403).json({ message: "Sai chữ ký xác thực Webhook!" });
+  }
+
+  // Chỉ xử lý giao dịch tiền vào tài khoản
+  if (req.body.transferType && req.body.transferType !== "in") {
+    return res.json({ message: "Bỏ qua giao dịch tiền ra" });
+  }
+
+  const transferAmount = Number(req.body.transferAmount || 0);
+  const content = String(req.body.content || "");
+  const match = content.match(/DH(\d+)/i);
+
+  if (!match) {
+    return res.status(400).json({ message: "Không tìm thấy mã đơn hàng trong nội dung chuyển khoản" });
+  }
+
+  const orderId = Number(match[1]);
+  const order = db.prepare("SELECT id, total_amount, status, note FROM orders WHERE id = ?").get(orderId);
+  if (!order) {
+    return res.status(404).json({ message: "Đơn hàng không tồn tại" });
+  }
+
+  if (order.status !== "pending") {
+    return res.json({ message: "Đơn hàng đã được xử lý trước đó", status: order.status });
+  }
+
+  // Kiểm tra nếu khách chuyển thiếu tiền
+  if (transferAmount < order.total_amount) {
+    const thieu = order.total_amount - transferAmount;
+    const warnNote = `${order.note ? order.note + " | " : ""}[CẢNH BÁO] Chuyển thiếu tiền: nhận ${transferAmount.toLocaleString("vi-VN")}đ / cần ${order.total_amount.toLocaleString("vi-VN")}đ (thiếu ${thieu.toLocaleString("vi-VN")}đ)`;
+    db.prepare("UPDATE orders SET note = ? WHERE id = ?").run(warnNote, orderId);
+    return res.status(400).json({
+      message: "Số tiền chuyển khoản không đủ, giữ nguyên trạng thái pending",
+      received: transferAmount,
+      expected: order.total_amount,
+    });
+  }
+
+  // Chỉ chuyển sang 'paid' khi số tiền nhận >= tổng tiền đơn hàng
+  db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(orderId);
+  res.json({ message: "Xác nhận thanh toán thành công", order_id: orderId, status: "paid" });
+});
+
+// Trang hiển thị mã VietQR động và tự động chờ xác nhận
 app.get("/payment/qr", (req, res) => {
   const { orderId } = req.query;
-  const order = orderId ? db.prepare("SELECT id, total_amount, status FROM orders WHERE id = ?").get(Number(orderId)) : null;
+  const order = orderId
+    ? db.prepare("SELECT id, total_amount, status, note FROM orders WHERE id = ?").get(Number(orderId))
+    : null;
+
   if (!order) {
     res.send("<h1>Không tìm thấy đơn hàng</h1><a href='/'>Về trang chủ</a>");
     return;
   }
+
   if (order.status === "paid") {
     res.send(`<!DOCTYPE html>
 <html lang="vi">
@@ -421,106 +461,90 @@ app.get("/payment/qr", (req, res) => {
   <style>
     *{box-sizing:border-box}body{margin:0;background:#fbfaf7;color:#18211f;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
     .card{background:#fff;border-radius:16px;padding:40px 32px;box-shadow:0 20px 60px rgba(24,33,31,0.14);text-align:center;max-width:420px;width:92%}
-    .icon{font-size:48px;margin-bottom:16px}
-    h1{font:'Plus Jakarta Sans',sans-serif;margin:0 0 8px;font-size:24px;letter-spacing:-0.04em}
+    h1{font-family:'Plus Jakarta Sans',sans-serif;margin:0 0 8px;font-size:24px;letter-spacing:-0.04em}
     p{color:#69716f;margin:0 0 20px;font-size:14px}
-    .order-id{font-weight:700;color:#18211f}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#18211f;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-weight:700;font-size:13px;text-decoration:none;margin-top:12px}
-    .btn:hover{background:#34403c}
+    .btn{display:inline-flex;align-items:center;justify-content:center;background:#18211f;color:#fff;border-radius:8px;padding:12px 24px;font-weight:700;font-size:13px;text-decoration:none}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">✅</div>
+    <div style="font-size:48px;margin-bottom:16px">✅</div>
     <h1>Đã thanh toán thành công</h1>
-    <p>Đơn hàng #${order.id} đã được xác nhận. Cảm ơn bạn đã mua sắm tại NOTE&CO!</p>
+    <p>Hệ thống đã nhận đủ <strong>${Number(order.total_amount).toLocaleString("vi-VN")}đ</strong> cho đơn hàng #${order.id}.</p>
     <a href="/" class="btn">Tiếp tục mua sắm</a>
   </div>
 </body>
 </html>`);
     return;
   }
+
+  const BANK_ID = process.env.BANK_ID || "MB";
+  const ACCOUNT_NO = process.env.ACCOUNT_NO || "0123456789";
+  const ACCOUNT_NAME = process.env.ACCOUNT_NAME || "LE MINH HIEU";
+  const transferContent = `NOTECO DH${order.id}`;
+  const dynamicQrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${order.total_amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+
   res.send(`<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Thanh toán MoMo — NOTE&CO</title>
+  <title>Thanh toán VietQR — NOTE&CO</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
   <style>
     *{box-sizing:border-box}body{margin:0;background:#fbfaf7;color:#18211f;font-family:'DM Sans',sans-serif}
     .page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
     .card{background:#fff;border-radius:16px;padding:32px;box-shadow:0 20px 60px rgba(24,33,31,0.14);text-align:center;max-width:420px;width:100%}
-    .brand{font:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:28px;letter-spacing:-0.04em;margin-bottom:8px}
+    .brand{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:28px;letter-spacing:-0.04em;margin-bottom:6px}
     .brand span{color:#ef5d3b}
-    .subtitle{color:#69716f;font-size:13px;margin-bottom:24px}
-    .qr-box{border:2px solid #f4c5a9;border-radius:16px;padding:16px;display:inline-block;background:#fff;margin-bottom:20px}
-    .qr-box img{display:block;width:260px;height:260px;border-radius:12px}
-    .amount{font:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;color:#18211f;margin:8px 0 4px}
-    .order-id{color:#69716f;font-size:12px;margin-bottom:20px}
-    .account-info{background:#f4c5a9;border-radius:12px;padding:16px;margin-bottom:20px;text-align:left}
-    .account-info p{margin:4px 0;color:#18211f;font-size:13px}
-    .account-info strong{color:#d94848}
-    .btn-confirm{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#ef5d3b;color:#fff;border:none;border-radius:8px;padding:14px 24px;font-weight:700;font-size:14px;text-decoration:none;width:100%;margin-bottom:12px}
-    .btn-confirm:hover{background:#d94848}
-    .btn-back{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:#69716f;border:1px solid #dfe3de;border-radius:8px;padding:12px 24px;font-weight:600;font-size:13px;text-decoration:none;width:100%}
+    .qr-box{border:2px solid #f4c5a9;border-radius:16px;padding:12px;display:inline-block;background:#fff;margin:16px 0}
+    .qr-box img{display:block;width:250px;height:auto;border-radius:10px}
+    .amount{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:22px;color:#d94848;margin:4px 0}
+    .info{background:#fff5f0;border:1px solid #f4c5a9;border-radius:12px;padding:14px;margin:16px 0;text-align:left;font-size:13px}
+    .info p{margin:5px 0}
+    .waiting{display:flex;align-items:center;justify-content:center;gap:8px;background:#eef3f7;color:#4a8db7;padding:12px;border-radius:8px;font-weight:600;font-size:13px;margin-bottom:12px}
+    .warn{background:#fdeaea;color:#d44;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px;display:none;text-align:left}
+    .btn-back{display:block;color:#69716f;border:1px solid #dfe3de;border-radius:8px;padding:11px;font-weight:600;font-size:13px;text-decoration:none}
     .btn-back:hover{border-color:#18211f;color:#18211f}
-    .note{font-size:11px;color:#aab3ae;margin-top:16px}
   </style>
 </head>
 <body>
   <div class="page">
     <div class="card">
-      <div class="brand">NOTE<span class="brand"> &</span>CO</div>
-      <div class="subtitle">Thanh toán qua MoMo</div>
+      <div class="brand">NOTE<span>&</span>CO</div>
+      <div style="color:#69716f;font-size:13px">Quét mã QR để thanh toán online</div>
       <div class="qr-box">
-        <img src="/assets/qr-momo.png" alt="Mã QR thanh toán MoMo" />
+        <img src="${dynamicQrUrl}" onerror="this.src='/assets/qr-momo.png'" alt="Mã QR thanh toán" />
       </div>
       <div class="amount">${Number(order.total_amount).toLocaleString("vi-VN")}đ</div>
-      <div class="order-id">Đơn hàng #${order.id}</div>
-      <div class="account-info">
-        <p><strong>Chủ tài khoản:</strong> LE MINH HIEU</p>
-        <p><strong>Nội dung:</strong> Thanh toán đơn hàng #${order.id} tại NOTE&CO</p>
+      <div style="color:#69716f;font-size:12px">Đơn hàng #${order.id}</div>
+      <div class="info">
+        <p><strong>Chủ tài khoản:</strong> ${ACCOUNT_NAME}</p>
+        <p><strong>Số tiền chính xác:</strong> ${Number(order.total_amount).toLocaleString("vi-VN")}đ</p>
+        <p><strong>Nội dung bắt buộc:</strong> <code style="color:#d94848;font-weight:700">${transferContent}</code></p>
       </div>
-      <a class="btn-confirm" id="btnConfirm">Tôi đã thanh toán</a>
+      <div class="warn" id="warnBox"></div>
+      <div class="waiting">⏳ Đang chờ hệ thống xác nhận giao dịch...</div>
       <a class="btn-back" href="/">Về trang chủ</a>
-      <p class="note">Sau khi quét QR và thanh toán xong, nhấn nút bên dưới để xác nhận đơn hàng.</p>
     </div>
   </div>
   <script>
-    document.getElementById('btnConfirm').addEventListener('click', async () => {
-      const res = await fetch('/api/payment/confirm', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ orderId: ${order.id} })
-      });
-      const data = await res.json();
-      if (data.status === 'paid') {
-        location.href = '/payment/qr?orderId=${order.id}';
-      } else {
-        alert(data.message || 'Có lỗi xảy ra');
-      }
-    });
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/payment/status/${order.id}');
+        const data = await res.json();
+        if (data.status === 'paid') {
+          location.reload();
+        } else if (data.note && data.note.includes('[CẢNH BÁO]')) {
+          const warnEl = document.getElementById('warnBox');
+          warnEl.style.display = 'block';
+          warnEl.innerText = data.note;
+        }
+      } catch (e) {}
+    }, 3000);
   </script>
 </body>
 </html>`);
-});
-
-// Xác nhận thanh toán từ khách hàng (gọi sau khi quét QR xong)
-app.post("/api/payment/confirm", (req, res) => {
-  const { orderId } = req.body;
-  if (!orderId) {
-    return res.status(400).json({ message: "Thiếu mã đơn hàng" });
-  }
-  const order = db.prepare("SELECT id, status FROM orders WHERE id = ?").get(Number(orderId));
-  if (!order) {
-    return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-  }
-  if (order.status !== "pending") {
-    return res.json({ message: "Đơn hàng đã được cập nhật trước đó", status: order.status });
-  }
-  db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(Number(orderId));
-  res.json({ message: "Cập nhật trạng thái thanh toán thành công", order_id: Number(orderId), status: "paid" });
 });
 
 app.get("/api/orders", auth, (req, res) => {

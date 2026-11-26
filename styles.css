@@ -2602,7 +2602,7 @@ a {
   width: 12px;
 }
 
-/* Nút thanh toán lại cho đơn MoMo chưa thanh toán */
+/* Nút thanh toán lại cho đơn thanh toán online chưa thanh toán */
 .order-pay-again {
   display: inline-flex;
   align-items: center;

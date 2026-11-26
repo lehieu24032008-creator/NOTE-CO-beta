@@ -1018,7 +1018,7 @@ async function openOrders() {
           <span class="order-status order-status--${o.status}">${o.status}</span>
           ${
             o.status === "pending"
-              ? o.payment_method === "momo"
+              ? o.payment_method === "online"
                 ? `<a class="order-pay-again" href="/payment/qr?orderId=${o.id}" target="_blank" rel="noopener">Thanh toán</a> <button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
                 : `<button class="order-cancel" data-order-cancel="${o.id}">Hủy đơn</button>`
               : o.status === "cancelled"
@@ -1028,8 +1028,8 @@ async function openOrders() {
         </div>
         <p class="order-card__addr">Giao tới: ${o.shipping_address} · ${new Date(o.created_at).toLocaleString("vi-VN")}</p>
         <p class="order-card__payment">
-          <span>Thanh toán: ${o.payment_method === "momo" ? "MoMo online" : "Tiền mặt khi nhận hàng (COD)"}</span>
-          <span class="order-payment-status order-payment-status--${o.status === "paid" ? "paid" : "unpaid"}">${o.status === "paid" ? "Đã thanh toán" : o.payment_method === "momo" ? "Chưa thanh toán" : "Thanh toán khi nhận hàng"}</span>
+          <span>Thanh toán: ${o.payment_method === "online" ? "Thanh toán online" : "Tiền mặt khi nhận hàng (COD)"}</span>
+          <span class="order-payment-status order-payment-status--${o.status === "paid" ? "paid" : "unpaid"}">${o.status === "paid" ? "Đã thanh toán" : o.payment_method === "online" ? "Chưa thanh toán" : "Thanh toán khi nhận hàng"}</span>
         </p>
         ${o.status !== "cancelled" ? `
         <div class="order-tracking">
