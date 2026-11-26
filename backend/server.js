@@ -78,6 +78,33 @@ function getUserCart(userId) {
   }));
 }
 
+function ensureWallet(userId) {
+  db.prepare("INSERT OR IGNORE INTO wallet_accounts (user_id, coins) VALUES (?, 0)").run(userId);
+  return db.prepare("SELECT coins, spin_multiplier FROM wallet_accounts WHERE user_id = ?").get(userId);
+}
+
+function awardOrderCoins(userId, orderId, total) {
+  const coins = Math.ceil(Number(total) * 0.01);
+  db.prepare("INSERT OR IGNORE INTO wallet_accounts (user_id, coins) VALUES (?, 0)").run(userId);
+  const tx = db.prepare(
+    `INSERT OR IGNORE INTO wallet_transactions (user_id, amount, type, reference_id, description)
+     VALUES (?, ?, 'order_reward', ?, ?)`
+  ).run(userId, coins, String(orderId), `Tích xu 1% từ đơn hàng #${orderId}`);
+  if (tx.changes) db.prepare("UPDATE wallet_accounts SET coins = coins + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(coins, userId);
+  return coins;
+}
+
+function walletPayload(userId) {
+  const completedCodOrders = db
+    .prepare("SELECT id, total_amount FROM orders WHERE user_id = ? AND payment_method = 'cod' AND status = 'completed'")
+    .all(userId);
+  for (const order of completedCodOrders) {
+    awardOrderCoins(userId, order.id, order.total_amount);
+  }
+  ensureWallet(userId);
+  return db.prepare("SELECT coins, spin_multiplier FROM wallet_accounts WHERE user_id = ?").get(userId);
+}
+
 // 1. Health check
 app.get("/api/health", (req, res) => {
   db.prepare("SELECT 1").get();
@@ -185,6 +212,78 @@ app.get("/api/auth/me", auth, (req, res) => {
     .get(req.user.id);
   if (!user) return res.status(404).json({ message: "Không tìm thấy tài khoản" });
   res.json(user);
+});
+
+app.get("/api/wallet", auth, (req, res) => {
+  const wallet = walletPayload(req.user.id);
+  const transactions = db.prepare("SELECT amount, type, description, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 8").all(req.user.id);
+  const vouchers = db.prepare(`SELECT uv.code, uv.status, uv.created_at, v.title, v.discount_text FROM user_vouchers uv JOIN vouchers v ON v.id = uv.voucher_id WHERE uv.user_id = ? ORDER BY uv.id DESC`).all(req.user.id);
+  res.json({ coins: wallet.coins, spin_multiplier: wallet.spin_multiplier, transactions, vouchers });
+});
+
+app.get("/api/wallet/vouchers", auth, (req, res) => {
+  res.json(db.prepare("SELECT id, title, description, discount_text, cost, quantity FROM vouchers WHERE active = 1 AND quantity > 0 ORDER BY cost ASC").all());
+});
+
+app.post("/api/wallet/vouchers/:voucherId/redeem", auth, (req, res) => {
+  try {
+    const result = withTransaction(() => {
+      const voucher = db.prepare("SELECT * FROM vouchers WHERE id = ? AND active = 1 AND quantity > 0").get(Number(req.params.voucherId));
+      if (!voucher) { const e = new Error("Voucher không còn khả dụng"); e.status = 400; throw e; }
+      const wallet = walletPayload(req.user.id);
+      if (wallet.coins < voucher.cost) { const e = new Error("Số xu trong ví chưa đủ"); e.status = 400; throw e; }
+      const code = `NOTE${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      db.prepare("UPDATE wallet_accounts SET coins = coins - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(voucher.cost, req.user.id);
+      db.prepare("INSERT INTO wallet_transactions (user_id, amount, type, reference_id, description) VALUES (?, ?, 'voucher_redeem', ?, ?)").run(req.user.id, -voucher.cost, code, `Đổi xu lấy ${voucher.title}`);
+      db.prepare("INSERT INTO user_vouchers (user_id, voucher_id, code) VALUES (?, ?, ?)").run(req.user.id, voucher.id, code);
+      db.prepare("UPDATE vouchers SET quantity = quantity - 1 WHERE id = ?").run(voucher.id);
+      return { code, title: voucher.title, discount_text: voucher.discount_text, coins: wallet.coins - voucher.cost };
+    });
+    res.status(201).json(result);
+  } catch (err) { res.status(err.status || 500).json({ message: err.message || "Không thể đổi voucher" }); }
+});
+
+app.post("/api/wallet/spin", auth, (req, res) => {
+  const spinCost = 50;
+  try {
+    const result = withTransaction(() => {
+      const wallet = walletPayload(req.user.id);
+      if (wallet.coins < spinCost) { const e = new Error("Cần 50 xu để quay"); e.status = 400; throw e; }
+      const prizes = [
+        { label: "+10 xu", reward: 10 }, { label: "+25 xu", reward: 25 },
+        { label: "x2 xu", multiplier: true }, { label: "+100 xu", reward: 100 },
+        { label: "Chúc bạn may mắn lần sau", reward: 0 },
+      ];
+      const prizeIndex = Math.floor(Math.random() * prizes.length);
+      const prize = prizes[prizeIndex];
+      const multiplierUsed = wallet.spin_multiplier || 1;
+      const rewardCoins = prize.multiplier ? 0 : (prize.reward || 0) * multiplierUsed;
+      const nextMultiplier = prize.multiplier ? 2 : 1;
+      const spinId = "spin_" + req.user.id + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      db.prepare("UPDATE wallet_accounts SET coins = coins - ?, spin_multiplier = 1, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(spinCost, req.user.id);
+      db.prepare("INSERT INTO wallet_spin_sessions (id, user_id, prize_index, label, reward_coins, multiplier_used, next_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?)").run(spinId, req.user.id, prizeIndex, prize.label, rewardCoins, multiplierUsed, nextMultiplier);
+      db.prepare("INSERT INTO wallet_transactions (user_id, amount, type, reference_id, description) VALUES (?, ?, 'spin_cost', ?, ?)").run(req.user.id, -spinCost, spinId, "Vòng xoay: trừ phí 50 xu");
+      return { spin_id: spinId, label: prize.label, prize_index: prizeIndex, coins: wallet.coins - spinCost, reward_coins: rewardCoins, multiplier_used: multiplierUsed, next_multiplier: nextMultiplier };
+    });
+    res.json(result);
+  } catch (err) { res.status(err.status || 500).json({ message: err.message || "Không thể quay lúc này" }); }
+});
+
+app.post("/api/wallet/spin/complete", auth, (req, res) => {
+  try {
+    const result = withTransaction(() => {
+      const session = db.prepare("SELECT * FROM wallet_spin_sessions WHERE id = ? AND user_id = ?").get(String(req.body.spin_id || ""), req.user.id);
+      if (!session) { const e = new Error("Không tìm thấy lượt quay"); e.status = 404; throw e; }
+      if (session.status !== "pending") { const e = new Error("Lượt quay này đã được xử lý"); e.status = 409; throw e; }
+      db.prepare("UPDATE wallet_accounts SET coins = coins + ?, spin_multiplier = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").run(session.reward_coins, session.next_multiplier, req.user.id);
+      const description = session.label === "x2 xu" ? "Vòng xoay: Đã lưu x2 cho lượt kế tiếp" : "Vòng xoay: +" + session.reward_coins + " xu" + (session.multiplier_used === 2 ? " (x2)" : "");
+      db.prepare("INSERT INTO wallet_transactions (user_id, amount, type, reference_id, description) VALUES (?, ?, 'spin_reward', ?, ?)").run(req.user.id, session.reward_coins, session.id, description);
+      db.prepare("UPDATE wallet_spin_sessions SET status = 'completed' WHERE id = ?").run(session.id);
+      const wallet = ensureWallet(req.user.id);
+      return { coins: wallet.coins, next_multiplier: wallet.spin_multiplier, reward_coins: session.reward_coins, multiplier_used: session.multiplier_used, label: session.label };
+    });
+    res.json(result);
+  } catch (err) { res.status(err.status || 500).json({ message: err.message || "Không thể hoàn tất lượt quay" }); }
 });
 
 // 4. Giỏ hàng
@@ -370,7 +469,9 @@ app.post("/api/orders/checkout", auth, (req, res) => {
         paymentUrl = `${process.env.BASE_URL || "http://localhost:3000"}/payment/qr?orderId=${orderId}`;
       }
 
-      return { order_id: orderId, total_amount: total, status: "pending", payment_method: paymentMethod, payment_url: paymentUrl };
+      // COD chỉ nhận xu khi đơn đã giao thành công; online nhận xu ngay khi tạo thanh toán.
+      const coinsEarned = paymentMethod === "online" ? awardOrderCoins(req.user.id, orderId, total) : 0;
+      return { order_id: orderId, total_amount: total, status: "pending", payment_method: paymentMethod, payment_url: paymentUrl, coins_earned: coinsEarned };
     });
 
     res.status(201).json(order);
@@ -412,7 +513,7 @@ app.post("/api/payment/webhook", (req, res) => {
   }
 
   const orderId = Number(match[1]);
-  const order = db.prepare("SELECT id, total_amount, status, note FROM orders WHERE id = ?").get(orderId);
+  const order = db.prepare("SELECT id, user_id, total_amount, status, note FROM orders WHERE id = ?").get(orderId);
   if (!order) {
     return res.status(404).json({ message: "Đơn hàng không tồn tại" });
   }
@@ -435,7 +536,8 @@ app.post("/api/payment/webhook", (req, res) => {
 
   // Chỉ chuyển sang 'paid' khi số tiền nhận >= tổng tiền đơn hàng
   db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(orderId);
-  res.json({ message: "Xác nhận thanh toán thành công", order_id: orderId, status: "paid" });
+  const coinsEarned = awardOrderCoins(order.user_id, orderId, order.total_amount);
+  res.json({ message: "Xác nhận thanh toán thành công", order_id: orderId, status: "paid", coins_earned: coinsEarned });
 });
 
 // Trang hiển thị mã VietQR động và tự động chờ xác nhận

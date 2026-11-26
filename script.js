@@ -353,6 +353,70 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const formatPrice = (n) => new Intl.NumberFormat("vi-VN").format(n) + "đ";
 
+/* ======== Loyalty wallet ======== */
+let walletData = { coins: 0, spin_multiplier: 1, transactions: [], vouchers: [] };
+let spinRotation = 0;
+function updateWalletStatus(multiplier = walletData.spin_multiplier || 1) {
+  const status = $("#spinBoostStatus");
+  if (!status) return;
+  status.textContent = multiplier === 2 ? "Đang có x2 cho lượt quay kế tiếp" : "Lượt kế tiếp: x1 xu";
+  status.classList.toggle("is-boosted", multiplier === 2);
+}
+function updateWalletBalance(coins = walletData.coins) {
+  walletData.coins = coins;
+  $("#walletCoinCount").textContent = coins.toLocaleString("vi-VN");
+  $("#walletBalance").textContent = coins.toLocaleString("vi-VN");
+  updateWalletStatus();
+}
+function showWalletDelta(label, amount) {
+  const delta = $("#walletDelta");
+  if (!delta) return;
+  delta.className = "wallet-delta " + (amount < 0 ? "is-negative" : "is-positive") + " is-visible";
+  delta.textContent = label;
+  void delta.offsetWidth;
+  delta.classList.remove("is-visible");
+  requestAnimationFrame(() => delta.classList.add("is-visible"));
+}
+function animateWalletBalance(from, to, deltaLabel, deltaAmount) {
+  const start = Number(from) || 0;
+  const end = Number(to) || 0;
+  const startedAt = performance.now();
+  const duration = 650;
+  showWalletDelta(deltaLabel, deltaAmount);
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = Math.round(start + (end - start) * eased);
+    $("#walletCoinCount").textContent = value.toLocaleString("vi-VN");
+    $("#walletBalance").textContent = value.toLocaleString("vi-VN");
+    if (progress < 1) requestAnimationFrame(tick);
+    else updateWalletBalance(end);
+  };
+  requestAnimationFrame(tick);
+}
+function renderWalletHistory() {
+  const el = $("#walletHistory");
+  el.innerHTML = walletData.transactions.length ? walletData.transactions.map((t) => `<div class="wallet-history-row"><span>${t.description}<small>${new Date(t.created_at).toLocaleString("vi-VN")}</small></span><b class="${t.amount >= 0 ? "coin-positive" : "coin-negative"}">${t.amount >= 0 ? "+" : ""}${t.amount} xu</b></div>`).join("") : "<p class='wallet-helper'>Chưa có giao dịch xu nào.</p>";
+}
+function renderOwnedVouchers() {
+  const el = $("#myVouchers");
+  el.innerHTML = walletData.vouchers.length ? `<h3>Voucher của bạn</h3>${walletData.vouchers.map((v) => `<div class="owned-voucher"><span>${v.title} · ${v.discount_text}</span><code>${v.code}</code></div>`).join("")}` : "";
+}
+async function loadWallet() {
+  walletData = await apiFetch("/wallet");
+  updateWalletBalance(); renderWalletHistory(); renderOwnedVouchers();
+  const vouchers = await apiFetch("/wallet/vouchers");
+  $("#voucherGrid").innerHTML = vouchers.map((v) => `<article class="voucher-card"><h3>${v.title}</h3><p>${v.description}</p><strong>${v.discount_text} · ${v.cost} xu</strong><button data-redeem-voucher="${v.id}" ${walletData.coins < v.cost ? "disabled" : ""}>Đổi voucher</button></article>`).join("");
+}
+async function openWallet(tab = "spin") {
+  if (!authToken) { openAuth("login"); toast("Đăng nhập để dùng ví tích lũy", "error"); return; }
+  try { await loadWallet(); } catch (err) { toast(err.message, "error"); return; }
+  $("#walletModal").classList.add("is-open"); $("#walletOverlay").classList.add("is-open"); document.body.style.overflow = "hidden";
+  $$(".wallet-tab").forEach((b) => b.classList.toggle("is-active", b.dataset.walletTab === tab));
+  $$(".wallet-panel").forEach((p) => p.classList.toggle("is-active", p.id === `wallet${tab.charAt(0).toUpperCase() + tab.slice(1)}Panel`));
+}
+function closeWallet() { $("#walletModal").classList.remove("is-open"); $("#walletOverlay").classList.remove("is-open"); document.body.style.overflow = ""; }
+
 /* ======== Products ======== */
 function renderProducts() {
   const q = state.search.trim().toLowerCase();
@@ -551,6 +615,11 @@ async function syncUserSession() {
     state.wishlist = new Set(wl.productIds || []);
     renderCart();
     renderProducts();
+    try {
+      await loadWallet();
+    } catch (walletErr) {
+      console.warn("Wallet sync failed:", walletErr.message);
+    }
   } catch (err) {
     console.warn("Sync session failed:", err.message);
   }
@@ -1069,6 +1138,117 @@ $("#shopNow").addEventListener("click", () => {
   closeCart();
   $("#products").scrollIntoView({ behavior: "smooth" });
 });
+$("#walletBtn").addEventListener("click", () => openWallet());
+$("#closeWallet").addEventListener("click", closeWallet);
+$("#walletOverlay").addEventListener("click", closeWallet);
+$(".wallet-tabs").addEventListener("click", (e) => { const tab = e.target.closest("[data-wallet-tab]"); if (tab) openWallet(tab.dataset.walletTab); });
+$("#spinBtn").addEventListener("click", async () => {
+  const btn = $("#spinBtn");
+  const wheel = $("#spinWheel");
+  const frame = $("#spinFrame");
+  const progress = $("#spinProgress");
+  const result = $("#spinResult");
+  if (walletData.coins < 50) { toast("Không đủ xu để quay", "error"); return; }
+  btn.disabled = true;
+  result.textContent = "Đã trừ 50 xu · Đang quay...";
+  result.className = "wallet-result";
+  frame.classList.add("is-active");
+  frame.classList.add("spin-frame--deducting");
+  progress.style.width = "0%";
+
+  const balanceBefore = walletData.coins;
+  const balanceAfterDeduct = balanceBefore - 50;
+  walletData.spin_multiplier = 1;
+  updateWalletStatus();
+  animateWalletBalance(balanceBefore, balanceAfterDeduct, "−50 xu", -50);
+  walletData.coins = balanceAfterDeduct;
+  $("#walletCoinCount").textContent = walletData.coins.toLocaleString("vi-VN");
+  $("#walletBalance").textContent = walletData.coins.toLocaleString("vi-VN");
+
+  const prizeLabels = ["+10 xu", "+25 xu", "x2 xu", "+100 xu", "Không trúng thưởng"];
+
+  try {
+    const res = await apiFetch("/wallet/spin", { method: "POST" });
+    // Fallback keeps the animation alive when an older backend is still running.
+    const prizeIndex = Number.isInteger(res.prize_index) ? res.prize_index : Math.floor(Math.random() * 5);
+    const segmentCenter = 36 + (prizeIndex * 72);
+    const currentAngle = ((spinRotation % 360) + 360) % 360;
+    const correction = (360 - segmentCenter - currentAngle + 360) % 360;
+    spinRotation += 2520 + correction;
+
+    const spinDuration = 4600;
+    const start = performance.now();
+    const runProgress = () => {
+      const now = performance.now();
+      const p = Math.min(1, (now - start) / spinDuration);
+      progress.style.width = (p * 100) + "%";
+      if (p < 1) requestAnimationFrame(runProgress);
+    };
+    requestAnimationFrame(runProgress);
+
+    wheel.style.transform = "rotate(" + spinRotation + "deg)";
+
+    let finished = false;
+    const finishSpin = async () => {
+      if (finished) return;
+      finished = true;
+      progress.style.width = "100%";
+      frame.classList.remove("is-active");
+      frame.classList.remove("spin-frame--deducting");
+      const isDouble = prizeIndex === 2;
+      const isMiss = prizeIndex === 4;
+      const stopLabel = isDouble
+        ? "+50 xu đã hoàn lại"
+        : isMiss
+          ? "Chúc bạn may mắn lần sau"
+          : prizeLabels[prizeIndex] + " đã cộng";
+      $("#spinResult").textContent = stopLabel;
+      result.className = "wallet-result is-success";
+      try {
+        const completed = await apiFetch("/wallet/spin/complete", {
+          method: "POST",
+          body: JSON.stringify({ spin_id: res.spin_id }),
+        });
+        walletData.spin_multiplier = completed.next_multiplier || 1;
+        updateWalletStatus(walletData.spin_multiplier);
+        let rewardCoins = Number(completed.reward_coins) || 0;
+        if (prizeIndex === 2) rewardCoins = 50; // hoàn lại chi phí quay khi trúng x2
+        const finalCoins = Number.isFinite(completed.coins) ? completed.coins : walletData.coins + rewardCoins;
+        if (rewardCoins > 0) {
+          frame.classList.add("spin-frame--adding");
+          setTimeout(() => frame.classList.remove("spin-frame--adding"), 1500);
+          showWalletDelta("+" + rewardCoins + " xu", rewardCoins);
+        }
+        animateWalletBalance(walletData.coins, finalCoins, stopLabel, rewardCoins);
+        walletData.coins = finalCoins;
+        updateWalletBalance(finalCoins);
+        $("#spinResult").textContent = stopLabel + " · Số dư: " + finalCoins + " xu";
+      } catch (completeErr) {
+        toast(completeErr.message, "error");
+        const fallbackCoins = walletData.coins;
+        $("#spinResult").textContent = stopLabel + " · Số dư: " + fallbackCoins + " xu";
+        await loadWallet().catch(() => {});
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    wheel.addEventListener("transitionend", (event) => {
+      if (event.propertyName === "transform") finishSpin();
+    }, { once: true });
+    setTimeout(finishSpin, 5200);
+  } catch (err) {
+    toast(err.message, "error");
+    btn.disabled = false;
+    frame.classList.remove("is-active");
+    frame.classList.remove("spin-frame--deducting");
+    await loadWallet().catch(() => {});
+  }
+});
+$("#voucherGrid").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-redeem-voucher]"); if (!btn) return;
+  btn.disabled = true;
+  try { const res = await apiFetch("/wallet/vouchers/" + btn.dataset.redeemVoucher + "/redeem", { method: "POST" }); updateWalletBalance(res.coins); toast("Đã đổi voucher " + res.code); await loadWallet(); } catch (err) { toast(err.message, "error"); btn.disabled = false; }
+});
 function openCheckout() {
   const total = state.cart.reduce((n, i) => n + i.price * i.qty, 0);
   $("#checkoutTotal").textContent = formatPrice(total);
@@ -1281,13 +1461,16 @@ $("#checkoutForm").addEventListener("submit", async (e) => {
     renderCart();
     closeCheckout();
     $("#checkoutForm").reset();
+    if (authToken) loadWallet().catch(() => {});
     if (res.payment_url) {
       window.open(res.payment_url, "_blank");
       toast(
-        `Đã tạo đơn hàng #${res.order_id}. Vui lòng hoàn tất thanh toán trên cửa sổ mới.`,
+        `Đã tạo đơn hàng #${res.order_id} · +${res.coins_earned || 0} xu. Vui lòng hoàn tất thanh toán trên cửa sổ mới.`,
       );
+    } else if (payment_method === "cod") {
+      toast(`Đặt hàng thành công! Mã đơn #${res.order_id}. Xu sẽ được cộng khi giao thành công 🎉`);
     } else {
-      toast(`Đặt hàng thành công! Mã đơn #${res.order_id} 🎉`);
+      toast(`Đặt hàng thành công! Mã đơn #${res.order_id} · +${res.coins_earned || 0} xu 🎉`);
     }
   } catch (err) {
     errEl.textContent = err.message;
@@ -1414,6 +1597,7 @@ document.addEventListener("keydown", (e) => {
     closeOrders();
     closeWishlist();
     closeAccount();
+    closeWallet();
     closeUserMenu();
   }
 });

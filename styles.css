@@ -183,6 +183,21 @@ a {
   align-items: center;
   gap: 22px;
 }
+.wallet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #ead89a;
+  background: #fff8dc;
+  color: #7a5c00;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform .2s, box-shadow .2s;
+}
+.wallet-pill:hover { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(175,137,24,.16); }
+.wallet-coin { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f3c84b; color: #fff; font-size: 12px; }
 .account-wrapper {
   position: relative;
 }
@@ -331,6 +346,64 @@ a {
 .user-menu__logout .icon {
   width: 14px;
 }
+
+/* --- Wallet --- */
+.wallet-modal { position: fixed; inset: 50% auto auto 50%; width: min(680px, calc(100% - 32px)); max-height: calc(100vh - 32px); overflow: auto; transform: translate(-50%, -46%); opacity: 0; pointer-events: none; z-index: 70; transition: opacity .25s, transform .25s; }
+.wallet-modal.is-open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+.wallet-modal__inner { position: relative; background: var(--paper); border-radius: 18px; padding: 28px; box-shadow: var(--shadow-lg); border: 1px solid var(--line); }
+.wallet-modal .close-btn { position: absolute; top: 18px; right: 18px; }
+.wallet-hero { display: flex; justify-content: space-between; align-items: center; gap: 22px; padding: 6px 34px 22px 0; }
+.wallet-hero h2 { margin: 5px 0 5px; font: 800 26px var(--display); letter-spacing: -.06em; }
+.wallet-hero p { margin: 0; color: var(--muted); font-size: 13px; max-width: 360px; }
+.spin-boost-badge { display: inline-flex; margin-top: 11px; padding: 7px 10px; border-radius: 999px; background: #eef1ed; color: var(--muted); font-size: 11px; font-weight: 800; }
+.spin-boost-badge.is-boosted { background: #fff0c2; color: #8b6500; box-shadow: 0 4px 12px rgba(175,137,24,.14); }
+.wallet-balance { position: relative; min-width: 130px; padding: 17px; border-radius: 14px; background: #fff4c7; border: 1px solid #ead89a; text-align: center; color: #7a5c00; overflow: hidden; }
+.wallet-balance > span:first-child { font-size: 18px; }.wallet-balance strong { display: block; font: 800 28px var(--display); line-height: 1; }.wallet-balance small { font-weight: 700; }
+.wallet-delta { display: block; min-height: 18px; margin-top: 5px; font-size: 12px; font-weight: 800; opacity: 0; transform: translateY(8px); }.wallet-delta.is-visible { animation: wallet-delta-pop .9s cubic-bezier(.2,.8,.2,1) both; }.wallet-delta.is-negative { color: #c94b3b; }.wallet-delta.is-positive { color: #4b8b6a; }
+@keyframes wallet-delta-pop { 0% { opacity: 0; transform: translateY(8px) scale(.92); } 25% { opacity: 1; transform: translateY(0) scale(1.05); } 100% { opacity: 0; transform: translateY(-10px) scale(1); } }
+.wallet-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin: 0 -28px; padding: 0 28px; }
+.wallet-tab { border: 0; background: transparent; padding: 12px 13px; color: var(--muted); font-weight: 700; font-size: 12px; border-bottom: 2px solid transparent; }.wallet-tab.is-active { color: var(--ink); border-color: var(--accent); }
+.wallet-panel { display: none; padding-top: 22px; }.wallet-panel.is-active { display: block; }
+.spin-stage { position: relative; width: 250px; height: 250px; margin: 3px auto 16px; }.spin-pointer { position: absolute; z-index: 2; left: 50%; top: -3px; transform: translateX(-50%); color: var(--accent); font-size: 25px; }.spin-wheel { width: 100%; height: 100%; border-radius: 50%; border: 10px solid #fff; box-shadow: 0 10px 30px rgba(24,33,31,.14); background: conic-gradient(#b9d9ee 0 20%, #f6df75 20% 40%, #d9c7ef 40% 60%, #f4c5a9 60% 80%, #c5e3d7 80% 100%); position: relative; transition: transform 4.6s cubic-bezier(.08,.82,.12,1); will-change: transform; }.spin-wheel::after { content: ""; position: absolute; inset: 50%; width: 18px; height: 18px; transform: translate(-50%,-50%); border-radius: 50%; background: #fff; box-shadow: 0 2px 7px rgba(24,33,31,.2); }.spin-wheel span { position: absolute; left: 50%; top: 50%; width: 88px; text-align: center; font-weight: 800; font-size: 11px; line-height: 1.15; z-index: 1; white-space: nowrap; }.spin-wheel span:nth-child(1){transform:translate(-50%,-50%) rotate(36deg) translateY(-73px) rotate(-36deg)}.spin-wheel span:nth-child(2){transform:translate(-50%,-50%) rotate(108deg) translateY(-73px) rotate(-108deg)}.spin-wheel span:nth-child(3){transform:translate(-50%,-50%) rotate(180deg) translateY(-73px) rotate(-180deg)}.spin-wheel span:nth-child(4){transform:translate(-50%,-50%) rotate(252deg) translateY(-73px) rotate(-252deg)}.spin-wheel span:nth-child(5){transform:translate(-50%,-50%) rotate(324deg) translateY(-73px) rotate(-324deg); white-space:normal; width:78px}
+.spin-frame {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 6px solid #f6df75;
+  opacity: 0;
+  transform: scale(0.8);
+  z-index: 0;
+  transition: opacity .3s, transform .3s;
+  box-shadow: 0 0 24px rgba(246, 223, 117, 0.5);
+}
+.spin-frame.is-active {
+  opacity: 1;
+  transform: scale(1);
+  animation: spinFramePulse 1s ease-in-out infinite;
+}
+.spin-frame--deducting {
+  animation: spinFrameCyanPulse 1s ease-in-out infinite;
+}
+.spin-frame--adding {
+  animation: spinFrameCyanPulse 1s ease-in-out infinite;
+}
+@keyframes spinFramePulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 24px rgba(246, 223, 117, 0.5); }
+  50% { opacity: 0.7; transform: scale(1.1); box-shadow: 0 0 40px rgba(246, 223, 117, 0.8); }
+}
+@keyframes spinFrameCyanPulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(246, 223, 117, 0.5), 0 0 0 rgba(16, 185, 129, 0); }
+  50% { box-shadow: 0 0 40px rgba(246, 223, 117, 0.8), 0 0 24px rgba(16, 185, 129, 0.55); }
+}
+@keyframes spinFrameGreenPulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(246, 223, 117, 0.5), 0 0 0 rgba(75, 139, 106, 0); }
+  50% { box-shadow: 0 0 40px rgba(246, 223, 117, 0.8), 0 0 24px rgba(75, 139, 106, 0.55); }
+}
+.spin-progress-wrap { margin-top: 10px; height: 6px; background: #eef1ed; border-radius: 3px; overflow: hidden; }
+.spin-progress { height: 100%; background: #ef5d3b; width: 0%; border-radius: 3px; transition: width .1s linear; }
+.wallet-helper,.wallet-result { text-align: center; color: var(--muted); font-size: 12px; }.wallet-result { min-height: 18px; color: var(--accent); font-weight: 700; }.wallet-result.is-success { color: #4b8b6a; }
+.voucher-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }.voucher-card { border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 14px; }.voucher-card h3 { font-size: 14px; margin: 0 0 5px; }.voucher-card p { color: var(--muted); font-size: 11px; min-height: 32px; margin: 0 0 11px; }.voucher-card strong { color: var(--accent); display: block; margin-bottom: 10px; }.voucher-card button { width: 100%; padding: 8px; border: 1px solid var(--ink); border-radius: 7px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; }.voucher-card button:disabled { opacity: .45; cursor: not-allowed; }.my-vouchers { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }.my-vouchers h3 { font-size: 13px; margin: 0 0 8px; }.owned-voucher { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 9px 0; border-bottom: 1px solid #edf0ec; }.owned-voucher code { color: var(--accent); font-weight: 700; }.wallet-history { display: grid; gap: 2px; }.wallet-history-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #edf0ec; font-size: 12px; }.wallet-history-row small { color: var(--muted); display: block; }.coin-positive { color: #4b8b6a; font-weight: 700; }.coin-negative { color: var(--accent); font-weight: 700; }
+@media (max-width: 760px) { .wallet-pill span:last-child { display:none; }.header-actions { gap: 11px; }.wallet-hero { align-items: flex-start; flex-direction: column; }.wallet-balance { align-self: stretch; }.voucher-grid { grid-template-columns: 1fr; }.wallet-modal__inner { padding: 22px 18px; }.wallet-tabs { margin: 0 -18px; padding: 0 18px; overflow-x: auto; } }
 
 /* --- Nav Bar --- */
 .nav-bar {

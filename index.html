@@ -27,6 +27,9 @@
         <button class="search-btn" id="searchBtn">Tìm kiếm</button>
       </div>
       <div class="header-actions">
+        <button class="wallet-pill" id="walletBtn" aria-label="Mở ví tích lũy">
+          <span class="wallet-coin">✦</span><span><b id="walletCoinCount">0</b> xu</span>
+        </button>
         <div class="account-wrapper">
           <button class="header-action" id="accountBtn">
             <svg class="icon"><use href="#i-user" /></svg>
@@ -454,6 +457,28 @@
           <button class="btn btn--outline btn--full" id="viewWishlistBtn">Xem sản phẩm yêu thích <svg class="icon"><use href="#i-heart"/></svg></button>
           <button class="btn btn--dark btn--full" id="viewOrdersBtn">Xem đơn hàng <svg class="icon"><use href="#i-bag"/></svg></button>
         </div>
+      </div>
+    </div>
+
+    <!-- ======== WALLET MODAL ======== -->
+    <div class="modal-overlay" id="walletOverlay"></div>
+    <div class="wallet-modal" id="walletModal" role="dialog" aria-modal="true" aria-label="Ví tích lũy">
+      <div class="wallet-modal__inner">
+        <button class="close-btn" id="closeWallet" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        <div class="wallet-hero">
+          <div><p class="eyebrow">NOTE&CO REWARDS</p><h2>Ví tích lũy</h2><p>Thanh toán xong, nhận ngay <strong>1 xu cho mỗi 100đ</strong> — luôn làm tròn lên.</p><div class="spin-boost-badge" id="spinBoostStatus">Lượt kế tiếp: x1 xu</div></div>
+          <div class="wallet-balance"><span>✦</span><strong id="walletBalance">0</strong><small>xu</small><span class="wallet-delta" id="walletDelta" aria-live="polite"></span></div>
+        </div>
+        <div class="wallet-tabs"><button class="wallet-tab is-active" data-wallet-tab="spin">Vòng xoay</button><button class="wallet-tab" data-wallet-tab="vouchers">Đổi voucher</button><button class="wallet-tab" data-wallet-tab="history">Lịch sử</button></div>
+        <section class="wallet-panel is-active" id="walletSpinPanel">
+          <div class="spin-stage"><div class="spin-pointer">▼</div><div class="spin-frame" id="spinFrame"></div><div class="spin-wheel" id="spinWheel"><span>+10 xu</span><span>+25 xu</span><span>x2 xu</span><span>+100 xu</span><span>Chúc bạn<br />may mắn<br />lần sau</span></div></div>
+          <p class="wallet-helper">Mỗi lượt quay dùng 50 xu. Phần thưởng được cộng/trừ ngay trong ví.</p>
+          <div class="spin-progress-wrap"><div class="spin-progress" id="spinProgress"></div></div>
+          <button class="btn btn--dark btn--full" id="spinBtn">Quay với 50 xu <svg class="icon"><use href="#i-arrow"/></svg></button>
+          <p class="wallet-result" id="spinResult"></p>
+        </section>
+        <section class="wallet-panel" id="walletVouchersPanel"><div class="voucher-grid" id="voucherGrid"></div><div class="my-vouchers" id="myVouchers"></div></section>
+        <section class="wallet-panel" id="walletHistoryPanel"><div class="wallet-history" id="walletHistory"></div></section>
       </div>
     </div>
 

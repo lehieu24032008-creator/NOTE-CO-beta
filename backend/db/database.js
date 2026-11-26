@@ -98,6 +98,67 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS wallet_accounts (
+    user_id INTEGER PRIMARY KEY,
+    coins INTEGER NOT NULL DEFAULT 0,
+    spin_multiplier INTEGER NOT NULL DEFAULT 1,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    reference_id TEXT,
+    description TEXT NOT NULL DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, type, reference_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS wallet_spin_sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    prize_index INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    reward_coins INTEGER NOT NULL DEFAULT 0,
+    multiplier_used INTEGER NOT NULL DEFAULT 1,
+    next_multiplier INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS vouchers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    discount_text TEXT NOT NULL,
+    cost INTEGER NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 999,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS user_vouchers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    voucher_id INTEGER NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'available',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (voucher_id) REFERENCES vouchers(id)
+  );
+`);
+
+db.exec(`
+  INSERT OR IGNORE INTO vouchers (id, title, description, discount_text, cost) VALUES
+    (1, 'Ưu đãi cho ngày mới', 'Áp dụng cho đơn từ 199.000đ', 'Giảm 20.000đ', 200),
+    (2, 'Gọn gàng hơn, vui hơn', 'Áp dụng cho đơn từ 299.000đ', 'Giảm 35.000đ', 350),
+    (3, 'NOTE&CO Premium', 'Áp dụng cho đơn từ 499.000đ', 'Giảm 60.000đ', 600);
 `);
 
 // Migration: add payment_method column for existing databases
@@ -184,6 +245,12 @@ function seedIfEmpty() {
       c.productIds.forEach((pid, idx) => insertColProd.run(c.id, pid, idx));
     }
   }
+}
+
+try {
+  db.exec("ALTER TABLE wallet_accounts ADD COLUMN spin_multiplier INTEGER NOT NULL DEFAULT 1");
+} catch {
+  // Column already exists, ignore
 }
 
 seedIfEmpty();
