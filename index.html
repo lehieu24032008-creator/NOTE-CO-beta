@@ -377,6 +377,26 @@
       </div>
     </div>
 
+    <!-- ======== QUANTITY MODAL ======== -->
+    <div class="modal-overlay" id="qtyOverlay"></div>
+    <div class="auth-modal" id="qtyModal" role="dialog" aria-modal="true" aria-label="Nhập số lượng">
+      <div class="auth-modal__inner">
+        <button class="close-btn auth-close" id="closeQty" aria-label="Đóng"><svg class="icon"><use href="#i-close" /></svg></button>
+        <p class="eyebrow">SỐ LƯỢNG</p>
+        <h2 id="qtyProductName">Sản phẩm</h2>
+        <p id="qtyProductStock">Còn trong kho: <strong id="qtyStockValue">0</strong></p>
+        <div class="form-group">
+          <label for="qtyInput">Số lượng</label>
+          <input type="number" id="qtyInput" min="1" value="1" />
+        </div>
+        <p class="form-error" id="qtyError"></p>
+        <div class="qty-actions">
+          <button class="btn btn--outline btn--full" id="cancelQty">Hủy</button>
+          <button class="btn btn--dark btn--full" id="confirmQty">Thêm vào giỏ <svg class="icon"><use href="#i-bag" /></svg></button>
+        </div>
+      </div>
+    </div>
+
     <!-- ======== ORDERS MODAL ======== -->
     <div class="modal-overlay" id="ordersOverlay"></div>
     <div class="collections-modal" id="ordersModal" role="dialog" aria-modal="true" aria-label="Đơn hàng của tôi">
@@ -455,6 +475,11 @@
           <p class="quick-price" id="quickPrice"></p>
           <p class="quick-description">Một lựa chọn gọn gàng cho bàn học và góc làm việc. Thiết kế tiện dụng, màu sắc dễ phối và phù hợp để dùng mỗi ngày.</p>
           <div class="quick-spec"><span>Quy cách</span><strong id="quickUnit"></strong></div>
+          <p class="quick-stock" id="quickStock"></p>
+          <div class="quick-qty">
+            <label>Số lượng</label>
+            <input type="number" id="quickQty" min="1" value="1" />
+          </div>
           <button class="btn btn--dark btn--full" id="quickAdd">Thêm vào giỏ hàng <svg class="icon"><use href="#i-bag" /></svg></button>
         </div>
       </div>

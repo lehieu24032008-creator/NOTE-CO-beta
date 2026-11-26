@@ -320,6 +320,7 @@ let state = {
 };
 let authToken = localStorage.getItem("notecoToken") || null;
 let currentUser = JSON.parse(localStorage.getItem("notecoUser") || "null");
+let pendingAddProductId = null;
 
 async function apiFetch(path, options = {}) {
   const headers = {
@@ -381,10 +382,13 @@ function renderProducts() {
           <div>
             <span class="product-price">${formatPrice(p.price)}</span>
             <span class="product-unit"> ${p.unit}</span>
+            <p class="product-stock ${p.stock <= 0 ? "stock-out" : ""}">${p.stock <= 0 ? "Hết hàng" : `Còn ${p.stock}`}</p>
           </div>
-          <button class="add-btn" data-add="${p.id}" aria-label="Thêm ${p.name} vào giỏ">
-            <svg class="icon"><use href="#i-bag"/></svg>
-          </button>
+          <div class="product-qty">
+            <button class="add-btn ${p.stock <= 0 ? "disabled" : ""}" data-add="${p.id}" ${p.stock <= 0 ? "disabled" : ""} aria-label="Thêm ${p.name} vào giỏ">
+              <svg class="icon"><use href="#i-bag"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </article>
@@ -408,12 +412,16 @@ function renderCart() {
       <div class="cart-item-info">
         <h3>${item.name}</h3>
         <p>${item.brand} · ${formatPrice(item.price)}</p>
+        <p class="cart-item-stock ${item.stock <= 0 ? "stock-out" : ""}">${item.stock <= 0 ? "Hết hàng" : `Còn ${item.stock}`}</p>
         <div class="qty-control">
           <button data-minus="${item.id}">−</button>
-          <span>${item.qty}</span>
+          <input type="number" class="cart-qty-input" data-cart-qty="${item.id}" min="1" max="${item.stock || 1}" value="${item.qty}" />
           <button data-plus="${item.id}">+</button>
         </div>
       </div>
+      <button class="cart-item-remove" data-cart-remove="${item.id}" aria-label="Xóa ${item.name} khỏi giỏ hàng">
+        <svg class="icon"><use href="#i-close"/></svg>
+      </button>
       <strong class="cart-item-price">${formatPrice(item.price * item.qty)}</strong>
     </div>
   `,
@@ -448,14 +456,14 @@ function toast(text, type = "success") {
   window.toastTimer = setTimeout(() => t.classList.remove("is-visible"), 2500);
 }
 
-async function addToCart(id) {
+async function addToCart(id, qty = 1) {
   const p = products.find((x) => x.id === id);
   if (!p) return;
   if (authToken) {
     try {
       const res = await apiFetch("/cart", {
         method: "POST",
-        body: JSON.stringify({ product_id: id, quantity: 1 }),
+        body: JSON.stringify({ product_id: id, quantity: qty }),
       });
       state.cart = res.items;
       renderCart();
@@ -466,8 +474,8 @@ async function addToCart(id) {
     return;
   }
   const found = state.cart.find((x) => x.id === id);
-  if (found) found.qty++;
-  else state.cart.push({ ...p, qty: 1 });
+  if (found) found.qty = Math.min(found.qty + qty, p.stock);
+  else state.cart.push({ ...p, qty: Math.min(qty, p.stock) });
   saveGuestCart();
   renderCart();
   toast(`${p.name} đã được thêm vào giỏ`);
@@ -483,6 +491,15 @@ function openQuick(id) {
   $("#quickImage").style.backgroundImage = `url(${p.image})`;
   $("#quickImage").className = `quick-image ${p.color}`;
   $("#quickAdd").dataset.addQuick = p.id;
+  $("#quickStock").textContent = p.stock <= 0 ? "Hết hàng" : `Còn ${p.stock}`;
+  $("#quickStock").className = p.stock <= 0 ? "stock-out" : "";
+  $("#quickQty").max = p.stock || 1;
+  $("#quickQty").value = 1;
+  if (p.stock <= 0) {
+    $("#quickAdd").disabled = true;
+  } else {
+    $("#quickAdd").disabled = false;
+  }
   $("#quickView").classList.add("is-open");
   $("#quickOverlay").classList.add("is-open");
 }
@@ -743,10 +760,13 @@ function browseCollection(collectionId) {
           <div>
             <span class="product-price">${formatPrice(p.price)}</span>
             <span class="product-unit"> ${p.unit}</span>
+            <p class="product-stock ${p.stock <= 0 ? "stock-out" : ""}">${p.stock <= 0 ? "Hết hàng" : `Còn ${p.stock}`}</p>
           </div>
-          <button class="add-btn" data-add="${p.id}" aria-label="Thêm ${p.name} vào giỏ">
-            <svg class="icon"><use href="#i-bag"/></svg>
-          </button>
+          <div class="product-qty">
+            <button class="add-btn ${p.stock <= 0 ? "disabled" : ""}" data-add="${p.id}" ${p.stock <= 0 ? "disabled" : ""} aria-label="Thêm ${p.name} vào giỏ">
+              <svg class="icon"><use href="#i-bag"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </article>
@@ -853,7 +873,21 @@ document.addEventListener("click", async (e) => {
   // Add to cart
   const add = e.target.closest("[data-add]");
   if (add) {
-    addToCart(Number(add.dataset.add));
+    const p = products.find((x) => x.id === Number(add.dataset.add));
+    if (!p) return;
+    if (p.stock <= 0) {
+      toast("Sản phẩm đã hết hàng", "error");
+      return;
+    }
+    pendingAddProductId = p.id;
+    $("#qtyProductName").textContent = p.name;
+    $("#qtyStockValue").textContent = p.stock;
+    $("#qtyInput").max = p.stock;
+    $("#qtyInput").value = Math.min(1, p.stock);
+    $("#qtyError").textContent = "";
+    $("#qtyModal").classList.add("is-open");
+    $("#qtyOverlay").classList.add("is-open");
+    document.body.style.overflow = "hidden";
     return;
   }
 
@@ -867,7 +901,8 @@ document.addEventListener("click", async (e) => {
   // Quick view add
   const quickAdd = e.target.closest("[data-add-quick]");
   if (quickAdd) {
-    addToCart(Number(quickAdd.dataset.addQuick));
+    const qty = Math.max(1, Number($("#quickQty").value || 1));
+    addToCart(Number(quickAdd.dataset.addQuick), qty);
     closeQuick();
     return;
   }
@@ -897,6 +932,30 @@ document.addEventListener("click", async (e) => {
     if (item.qty < 1) state.cart = state.cart.filter((x) => x.id !== id);
     saveGuestCart();
     renderCart();
+    return;
+  }
+
+  // Remove item from cart
+  const cartRemove = e.target.closest("[data-cart-remove]");
+  if (cartRemove) {
+    const id = Number(cartRemove.dataset.cartRemove);
+    if (authToken) {
+      try {
+        const res = await apiFetch(`/cart/${id}`, {
+          method: "DELETE",
+        });
+        state.cart = res.items;
+        renderCart();
+        toast("Đã xóa sản phẩm khỏi giỏ hàng");
+      } catch (err) {
+        toast(err.message, "error");
+      }
+      return;
+    }
+    state.cart = state.cart.filter((x) => x.id !== id);
+    saveGuestCart();
+    renderCart();
+    toast("Đã xóa sản phẩm khỏi giỏ hàng");
     return;
   }
 
@@ -973,6 +1032,33 @@ $("#clearSearch").addEventListener("click", () => {
 $("#cartBtn").addEventListener("click", openCart);
 $("#closeCart").addEventListener("click", closeCart);
 $("#drawerOverlay").addEventListener("click", closeCart);
+$("#cartItems").addEventListener("change", async (e) => {
+  const input = e.target.closest("[data-cart-qty]");
+  if (!input) return;
+  const id = Number(input.dataset.cartQty);
+  const qty = Math.max(1, Number(input.value || 1));
+  const item = state.cart.find((x) => x.id === id);
+  if (!item) return;
+  input.value = qty;
+  if (authToken) {
+    try {
+      const res = await apiFetch(`/cart/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ quantity: qty }),
+      });
+      state.cart = res.items;
+      renderCart();
+    } catch (err) {
+      toast(err.message, "error");
+      renderCart();
+    }
+    return;
+  }
+  item.qty = Math.min(qty, item.stock || item.qty);
+  input.value = item.qty;
+  saveGuestCart();
+  renderCart();
+});
 $("#shopNow").addEventListener("click", () => {
   closeCart();
   $("#products").scrollIntoView({ behavior: "smooth" });
@@ -1222,6 +1308,27 @@ $("#wishlistOverlay").addEventListener("click", closeWishlist);
 
 $("#closeAccount").addEventListener("click", closeAccount);
 $("#accountOverlay").addEventListener("click", closeAccount);
+
+// Quantity modal
+function closeQty() {
+  $("#qtyModal").classList.remove("is-open");
+  $("#qtyOverlay").classList.remove("is-open");
+  document.body.style.overflow = "";
+  pendingAddProductId = null;
+}
+$("#closeQty").addEventListener("click", closeQty);
+$("#qtyOverlay").addEventListener("click", closeQty);
+$("#cancelQty").addEventListener("click", closeQty);
+$("#confirmQty").addEventListener("click", async () => {
+  const qty = Math.max(1, Number($("#qtyInput").value || 1));
+  const p = products.find((x) => x.id === pendingAddProductId);
+  if (!p || qty > p.stock) {
+    $("#qtyError").textContent = "Số lượng vượt quá tồn kho";
+    return;
+  }
+  closeQty();
+  addToCart(pendingAddProductId, qty);
+});
 
 $("#viewWishlistBtn").addEventListener("click", () => {
   closeAccount();
