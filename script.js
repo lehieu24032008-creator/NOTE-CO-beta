@@ -894,7 +894,13 @@ document.addEventListener("click", async (e) => {
   // Product card click -> quick view
   const card = e.target.closest(".product-card");
   if (card && !e.target.closest("button")) {
-    openQuick(Number(card.querySelector("[data-add]").dataset.add));
+    const pid = Number(card.querySelector("[data-add]").dataset.add);
+    const p = products.find((x) => x.id === pid);
+    if (p && p.stock <= 0) {
+      toast("Sản phẩm đã hết hàng", "error");
+      return;
+    }
+    openQuick(pid);
     return;
   }
 
@@ -1321,13 +1327,14 @@ $("#qtyOverlay").addEventListener("click", closeQty);
 $("#cancelQty").addEventListener("click", closeQty);
 $("#confirmQty").addEventListener("click", async () => {
   const qty = Math.max(1, Number($("#qtyInput").value || 1));
-  const p = products.find((x) => x.id === pendingAddProductId);
+  const productId = pendingAddProductId;
+  const p = products.find((x) => x.id === productId);
   if (!p || qty > p.stock) {
     $("#qtyError").textContent = "Số lượng vượt quá tồn kho";
     return;
   }
   closeQty();
-  addToCart(pendingAddProductId, qty);
+  addToCart(productId, qty);
 });
 
 $("#viewWishlistBtn").addEventListener("click", () => {
