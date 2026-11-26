@@ -129,14 +129,27 @@
             <h2>Những món đang được chọn</h2>
           </div>
           <div class="product-controls">
-            <label class="select-wrap">Sắp xếp
-              <select id="sortSelect">
-                <option value="featured">Nổi bật nhất</option>
-                <option value="priceAsc">Giá thấp đến cao</option>
-                <option value="priceDesc">Giá cao đến thấp</option>
-              </select>
-              <svg class="icon"><use href="#i-chevron" /></svg>
-            </label>
+            <div class="sort-dropdown" id="sortDropdown">
+              <span class="sort-dropdown__label">Sắp xếp</span>
+              <button type="button" class="sort-dropdown__trigger" id="sortTrigger" aria-haspopup="listbox" aria-expanded="false">
+                <span id="sortLabel">Nổi bật nhất</span>
+                <svg class="icon"><use href="#i-chevron" /></svg>
+              </button>
+              <div class="sort-dropdown__menu" id="sortMenu" role="listbox" aria-label="Sắp xếp sản phẩm">
+                <button type="button" class="sort-dropdown__option is-selected" role="option" aria-selected="true" data-sort="featured">
+                  <span>Nổi bật nhất</span>
+                  <svg class="icon"><use href="#i-check" /></svg>
+                </button>
+                <button type="button" class="sort-dropdown__option" role="option" aria-selected="false" data-sort="priceAsc">
+                  <span>Giá thấp đến cao</span>
+                  <svg class="icon"><use href="#i-check" /></svg>
+                </button>
+                <button type="button" class="sort-dropdown__option" role="option" aria-selected="false" data-sort="priceDesc">
+                  <span>Giá cao đến thấp</span>
+                  <svg class="icon"><use href="#i-check" /></svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="filter-row">
@@ -347,6 +360,16 @@
         <p class="eyebrow">NOTE&CO CHECKOUT</p>
         <h2 style="margin:6px 0 16px">Xác nhận đặt hàng</h2>
         <form id="checkoutForm">
+          <div class="checkout-row">
+            <div class="form-group">
+              <label for="customerName">Tên người nhận</label>
+              <input type="text" id="customerName" placeholder="Nhập tên người nhận" required />
+            </div>
+            <div class="form-group">
+              <label for="customerPhone">Số điện thoại</label>
+              <input type="tel" id="customerPhone" inputmode="numeric" pattern="[0-9]{9,11}" maxlength="11" placeholder="Chỉ nhập số (VD: 0912345678)" required />
+            </div>
+          </div>
           <div class="form-group">
             <label for="shippingAddress">Địa chỉ giao hàng</label>
             <input type="text" id="shippingAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, TP..." required />
@@ -354,6 +377,15 @@
           <div class="form-group">
             <label for="orderNote">Ghi chú (không bắt buộc)</label>
             <input type="text" id="orderNote" placeholder="Ví dụ: Giao giờ hành chính" />
+          </div>
+          <div class="form-group">
+            <label for="voucherCode">Mã voucher</label>
+            <div class="voucher-input-row">
+              <input type="text" id="voucherCode" placeholder="Nhập mã hoặc chọn từ ví xu bên dưới" autocomplete="off" />
+              <button type="button" class="btn btn--outline btn--sm" id="applyVoucherBtn">Áp dụng</button>
+            </div>
+            <p class="voucher-status" id="voucherStatus"></p>
+            <div class="checkout-vouchers" id="checkoutVoucherSuggestions"></div>
           </div>
           <div class="form-group">
             <label>Phương thức thanh toán</label>
@@ -370,9 +402,19 @@
               </label>
             </div>
           </div>
-          <div class="checkout-total">
-            <span>Tổng thanh toán</span>
-            <strong id="checkoutTotal">0đ</strong>
+          <div class="checkout-summary">
+            <div class="checkout-summary__row">
+              <span>Tạm tính</span>
+              <span id="checkoutSubtotal">0đ</span>
+            </div>
+            <div class="checkout-summary__row checkout-summary__row--discount" id="checkoutDiscountRow" hidden>
+              <span>Giảm giá voucher</span>
+              <span id="checkoutDiscount">-0đ</span>
+            </div>
+            <div class="checkout-total">
+              <span>Tổng thanh toán</span>
+              <strong id="checkoutTotal">0đ</strong>
+            </div>
           </div>
           <p class="form-error" id="checkoutError"></p>
           <button type="submit" class="btn btn--dark btn--full" id="checkoutSubmit">Đặt hàng ngay <svg class="icon"><use href="#i-arrow" /></svg></button>

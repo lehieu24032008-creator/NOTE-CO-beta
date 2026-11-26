@@ -217,7 +217,7 @@ app.get("/api/auth/me", auth, (req, res) => {
 app.get("/api/wallet", auth, (req, res) => {
   const wallet = walletPayload(req.user.id);
   const transactions = db.prepare("SELECT amount, type, description, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 8").all(req.user.id);
-  const vouchers = db.prepare(`SELECT uv.code, uv.status, uv.created_at, v.title, v.discount_text FROM user_vouchers uv JOIN vouchers v ON v.id = uv.voucher_id WHERE uv.user_id = ? ORDER BY uv.id DESC`).all(req.user.id);
+  const vouchers = db.prepare(`SELECT uv.code, uv.status, uv.created_at, v.title, v.description, v.discount_text FROM user_vouchers uv JOIN vouchers v ON v.id = uv.voucher_id WHERE uv.user_id = ? ORDER BY uv.id DESC`).all(req.user.id);
   res.json({ coins: wallet.coins, spin_multiplier: wallet.spin_multiplier, transactions, vouchers });
 });
 
@@ -405,11 +405,25 @@ app.post("/api/wishlist/:productId", auth, (req, res) => {
   res.status(201).json({ wishlisted: true });
 });
 
+function parseCurrencyNumber(text) {
+  const digits = String(text || "").replace(/[^\d]/g, "");
+  return digits ? Number(digits) : 0;
+}
+
 // 6. Đặt hàng (Checkout) & Lịch sử đơn hàng
 app.post("/api/orders/checkout", auth, (req, res) => {
+  const recipientName = String(req.body.recipient_name || req.user.name || "").trim();
+  const phone = String(req.body.phone || "").trim();
   const shippingAddress = String(req.body.shipping_address || "").trim();
   const note = String(req.body.note || "").trim();
+  const voucherCode = String(req.body.voucher_code || "").trim().toUpperCase();
   const paymentMethod = String(req.body.payment_method || "cod").trim();
+  if (!recipientName) {
+    return res.status(400).json({ message: "Vui lòng nhập tên người nhận" });
+  }
+  if (!/^\d{9,11}$/.test(phone)) {
+    return res.status(400).json({ message: "Số điện thoại phải gồm 9–11 chữ số" });
+  }
   if (!shippingAddress) {
     return res.status(400).json({ message: "Vui lòng nhập địa chỉ giao hàng" });
   }
@@ -434,21 +448,51 @@ app.post("/api/orders/checkout", auth, (req, res) => {
         throw err;
       }
 
-      let total = 0;
+      let subtotal = 0;
       for (const item of items) {
         if (item.stock < item.quantity) {
           const err = new Error(`Sản phẩm "${item.name}" không đủ tồn kho`);
           err.status = 400;
           throw err;
         }
-        total += Number(item.price) * item.quantity;
+        subtotal += Number(item.price) * item.quantity;
       }
+
+      let discountAmount = 0;
+      let appliedCode = "";
+      if (voucherCode) {
+        const uv = db
+          .prepare(
+            `SELECT uv.id, uv.code, v.title, v.description, v.discount_text
+             FROM user_vouchers uv
+             JOIN vouchers v ON v.id = uv.voucher_id
+             WHERE uv.user_id = ? AND UPPER(uv.code) = ? AND uv.status = 'available'`,
+          )
+          .get(req.user.id, voucherCode);
+        if (!uv) {
+          const err = new Error("Mã voucher không hợp lệ hoặc đã được sử dụng");
+          err.status = 400;
+          throw err;
+        }
+        const minOrder = parseCurrencyNumber(uv.description);
+        if (minOrder > 0 && subtotal < minOrder) {
+          const err = new Error(`Voucher ${uv.code} áp dụng cho đơn từ ${minOrder.toLocaleString("vi-VN")}đ`);
+          err.status = 400;
+          throw err;
+        }
+        const rawDiscount = parseCurrencyNumber(uv.discount_text);
+        discountAmount = Math.min(subtotal, rawDiscount);
+        appliedCode = uv.code;
+        db.prepare("UPDATE user_vouchers SET status = 'used' WHERE id = ?").run(uv.id);
+      }
+
+      const finalTotal = Math.max(0, subtotal - discountAmount);
 
       const orderRes = db
         .prepare(
-          "INSERT INTO orders (user_id, total_amount, shipping_address, note, payment_method) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO orders (user_id, total_amount, shipping_address, note, payment_method, recipient_name, phone, voucher_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .run(req.user.id, total, shippingAddress, note, paymentMethod);
+        .run(req.user.id, finalTotal, shippingAddress, note, paymentMethod, recipientName, phone, appliedCode, discountAmount);
       const orderId = Number(orderRes.lastInsertRowid);
 
       const insertOrderItem = db.prepare(
@@ -470,8 +514,8 @@ app.post("/api/orders/checkout", auth, (req, res) => {
       }
 
       // COD chỉ nhận xu khi đơn đã giao thành công; online nhận xu ngay khi tạo thanh toán.
-      const coinsEarned = paymentMethod === "online" ? awardOrderCoins(req.user.id, orderId, total) : 0;
-      return { order_id: orderId, total_amount: total, status: "pending", payment_method: paymentMethod, payment_url: paymentUrl, coins_earned: coinsEarned };
+      const coinsEarned = paymentMethod === "online" ? awardOrderCoins(req.user.id, orderId, finalTotal) : 0;
+      return { order_id: orderId, total_amount: finalTotal, discount_amount: discountAmount, status: "pending", payment_method: paymentMethod, payment_url: paymentUrl, coins_earned: coinsEarned };
     });
 
     res.status(201).json(order);

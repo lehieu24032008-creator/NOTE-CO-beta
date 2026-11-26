@@ -400,7 +400,30 @@ function renderWalletHistory() {
 }
 function renderOwnedVouchers() {
   const el = $("#myVouchers");
-  el.innerHTML = walletData.vouchers.length ? `<h3>Voucher của bạn</h3>${walletData.vouchers.map((v) => `<div class="owned-voucher"><span>${v.title} · ${v.discount_text}</span><code>${v.code}</code></div>`).join("")}` : "";
+  if (!walletData.vouchers.length) {
+    el.innerHTML = "";
+    return;
+  }
+  const sorted = [...walletData.vouchers].sort((a, b) => {
+    const aUsed = a.status !== "available" ? 1 : 0;
+    const bUsed = b.status !== "available" ? 1 : 0;
+    return aUsed - bUsed;
+  });
+  el.innerHTML = `<h3>Voucher của bạn</h3>${sorted
+    .map((v) => {
+      const isAvailable = v.status === "available";
+      return `<div class="owned-voucher${isAvailable ? "" : " is-used"}">
+        <div class="owned-voucher__info">
+          <span>${v.title} · <strong>${v.discount_text}</strong></span>
+          ${v.description ? `<small>${v.description}</small>` : ""}
+        </div>
+        <div class="owned-voucher__meta">
+          <span class="owned-voucher__status ${isAvailable ? "is-available" : "is-used"}">${isAvailable ? "Khả dụng" : "Đã sử dụng"}</span>
+          <button type="button" class="owned-voucher__code" data-copy-voucher="${v.code}" ${isAvailable ? "" : "disabled"} title="${isAvailable ? "Nhấn để sao chép mã" : "Voucher đã sử dụng"}"><code>${v.code}</code></button>
+        </div>
+      </div>`;
+    })
+    .join("")}`;
 }
 async function loadWallet() {
   walletData = await apiFetch("/wallet");
@@ -1089,10 +1112,41 @@ $("#searchInput").addEventListener("input", (e) => {
 $("#searchBtn").addEventListener("click", () =>
   $("#products").scrollIntoView({ behavior: "smooth" }),
 );
-$("#sortSelect").addEventListener("change", (e) => {
-  state.sort = e.target.value;
-  renderProducts();
-});
+const sortDropdown = $("#sortDropdown");
+const sortTrigger = $("#sortTrigger");
+const sortMenu = $("#sortMenu");
+const sortLabel = $("#sortLabel");
+if (sortDropdown && sortTrigger && sortMenu) {
+  const closeSortDropdown = () => {
+    sortDropdown.classList.remove("is-open");
+    sortTrigger.setAttribute("aria-expanded", "false");
+  };
+  sortTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = sortDropdown.classList.toggle("is-open");
+    sortTrigger.setAttribute("aria-expanded", String(isOpen));
+  });
+  sortMenu.addEventListener("click", (e) => {
+    const option = e.target.closest("[data-sort]");
+    if (!option) return;
+    const value = option.dataset.sort;
+    state.sort = value;
+    sortLabel.textContent = option.querySelector("span").textContent;
+    sortMenu.querySelectorAll("[data-sort]").forEach((btn) => {
+      const selected = btn === option;
+      btn.classList.toggle("is-selected", selected);
+      btn.setAttribute("aria-selected", String(selected));
+    });
+    closeSortDropdown();
+    renderProducts();
+  });
+  document.addEventListener("click", (e) => {
+    if (!sortDropdown.contains(e.target)) closeSortDropdown();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSortDropdown();
+  });
+}
 $("#clearSearch").addEventListener("click", () => {
   state.search = "";
   state.filter = "Tất cả";
@@ -1273,18 +1327,131 @@ $("#spinBtn").addEventListener("click", async () => {
     await loadWallet().catch(() => {});
   }
 });
+$("#myVouchers").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-copy-voucher]");
+  if (!btn || btn.disabled) return;
+  const code = btn.dataset.copyVoucher;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => toast("Đã sao chép mã " + code)).catch(() => toast("Mã voucher: " + code));
+  } else {
+    toast("Mã voucher: " + code);
+  }
+});
 $("#voucherGrid").addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-redeem-voucher]"); if (!btn) return;
   btn.disabled = true;
   try { const res = await apiFetch("/wallet/vouchers/" + btn.dataset.redeemVoucher + "/redeem", { method: "POST" }); updateWalletBalance(res.coins); toast("Đã đổi voucher " + res.code); await loadWallet(); } catch (err) { toast(err.message, "error"); btn.disabled = false; }
 });
-function openCheckout() {
-  const total = state.cart.reduce((n, i) => n + i.price * i.qty, 0);
-  $("#checkoutTotal").textContent = formatPrice(total);
+let appliedCheckoutVoucher = null;
+
+function parseVoucherCurrency(text) {
+  const digits = String(text || "").replace(/[^\d]/g, "");
+  return digits ? Number(digits) : 0;
+}
+
+function updateCheckoutSummary() {
+  const subtotal = state.cart.reduce((n, i) => n + i.price * i.qty, 0);
+  let discount = 0;
+  if (appliedCheckoutVoucher) {
+    discount = Math.min(subtotal, appliedCheckoutVoucher.discount);
+  }
+  const finalTotal = Math.max(0, subtotal - discount);
+  $("#checkoutSubtotal").textContent = formatPrice(subtotal);
+  const discountRow = $("#checkoutDiscountRow");
+  if (discount > 0) {
+    discountRow.hidden = false;
+    $("#checkoutDiscount").textContent = "-" + formatPrice(discount);
+  } else {
+    discountRow.hidden = true;
+  }
+  $("#checkoutTotal").textContent = formatPrice(finalTotal);
+}
+
+function renderCheckoutVoucherSuggestions() {
+  const container = $("#checkoutVoucherSuggestions");
+  if (!container) return;
+  const available = (walletData.vouchers || []).filter((v) => v.status === "available");
+  if (!available.length) {
+    container.innerHTML = `<p class="checkout-vouchers__empty">Bạn chưa có voucher khả dụng trong ví tích lũy xu.</p>`;
+    return;
+  }
+  container.innerHTML = `
+    <span class="checkout-vouchers__title">Voucher khả dụng trong ví của bạn:</span>
+    <div class="checkout-vouchers__list">
+      ${available
+        .map((v) => {
+          const isSelected = appliedCheckoutVoucher && appliedCheckoutVoucher.code === v.code;
+          return `<button type="button" class="checkout-voucher-chip${isSelected ? " is-selected" : ""}" data-apply-voucher="${v.code}" title="${v.description || v.title}">
+            <code>${v.code}</code>
+            <span>${v.discount_text}</span>
+          </button>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function applyCheckoutVoucher(rawCode) {
+  const code = String(rawCode || "").trim().toUpperCase();
+  const statusEl = $("#voucherStatus");
+  if (!code) {
+    appliedCheckoutVoucher = null;
+    statusEl.textContent = "";
+    statusEl.className = "voucher-status";
+    updateCheckoutSummary();
+    renderCheckoutVoucherSuggestions();
+    return;
+  }
+  const found = (walletData.vouchers || []).find(
+    (v) => v.status === "available" && v.code.toUpperCase() === code,
+  );
+  if (!found) {
+    appliedCheckoutVoucher = null;
+    statusEl.textContent = "Mã voucher không hợp lệ hoặc không có trong ví khả dụng.";
+    statusEl.className = "voucher-status is-error";
+    updateCheckoutSummary();
+    renderCheckoutVoucherSuggestions();
+    return;
+  }
+  const subtotal = state.cart.reduce((n, i) => n + i.price * i.qty, 0);
+  const minOrder = parseVoucherCurrency(found.description);
+  if (minOrder > 0 && subtotal < minOrder) {
+    appliedCheckoutVoucher = null;
+    statusEl.textContent = `Voucher ${found.code} áp dụng cho đơn từ ${formatPrice(minOrder)}.`;
+    statusEl.className = "voucher-status is-error";
+    updateCheckoutSummary();
+    renderCheckoutVoucherSuggestions();
+    return;
+  }
+  const discount = parseVoucherCurrency(found.discount_text);
+  appliedCheckoutVoucher = { code: found.code, discount, title: found.title };
+  $("#voucherCode").value = found.code;
+  statusEl.textContent = `Đã áp dụng ${found.code} (${found.discount_text}).`;
+  statusEl.className = "voucher-status is-applied";
+  updateCheckoutSummary();
+  renderCheckoutVoucherSuggestions();
+}
+
+async function openCheckout() {
+  appliedCheckoutVoucher = null;
+  $("#customerName").value = currentUser?.name || "";
+  $("#voucherCode").value = "";
+  $("#voucherStatus").textContent = "";
+  $("#voucherStatus").className = "voucher-status";
   $("#checkoutError").textContent = "";
+  updateCheckoutSummary();
+  renderCheckoutVoucherSuggestions();
   $("#checkoutModal").classList.add("is-open");
   $("#checkoutOverlay").classList.add("is-open");
   document.body.style.overflow = "hidden";
+  if (authToken) {
+    try {
+      await loadWallet();
+      renderCheckoutVoucherSuggestions();
+    } catch {
+      // Keep existing cached wallet data if refresh fails
+    }
+  }
 }
 function closeCheckout() {
   $("#checkoutModal").classList.remove("is-open");
@@ -1470,10 +1637,30 @@ $("#checkoutBtn").addEventListener("click", () => {
   closeCart();
   openCheckout();
 });
+$("#customerPhone").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "");
+});
+$("#applyVoucherBtn").addEventListener("click", () => {
+  applyCheckoutVoucher($("#voucherCode").value);
+});
+$("#checkoutVoucherSuggestions").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-apply-voucher]");
+  if (!chip) return;
+  const code = chip.dataset.applyVoucher;
+  if (appliedCheckoutVoucher && appliedCheckoutVoucher.code === code) {
+    $("#voucherCode").value = "";
+    applyCheckoutVoucher("");
+  } else {
+    applyCheckoutVoucher(code);
+  }
+});
 $("#closeCheckout").addEventListener("click", closeCheckout);
 $("#checkoutOverlay").addEventListener("click", closeCheckout);
 $("#checkoutForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const recipient_name = $("#customerName").value.trim();
+  const phone = $("#customerPhone").value.replace(/\D/g, "");
+  $("#customerPhone").value = phone;
   const shipping_address = $("#shippingAddress").value.trim();
   const note = $("#orderNote").value.trim();
   const payment_method = $("#checkoutForm").querySelector(
@@ -1481,12 +1668,37 @@ $("#checkoutForm").addEventListener("submit", async (e) => {
   ).value;
   const errEl = $("#checkoutError");
   errEl.textContent = "";
+  if (!recipient_name) {
+    errEl.textContent = "Vui lòng nhập tên người nhận";
+    return;
+  }
+  if (!/^\d{9,11}$/.test(phone)) {
+    errEl.textContent = "Số điện thoại phải gồm 9–11 chữ số";
+    $("#customerPhone").focus();
+    return;
+  }
+  const typedVoucher = $("#voucherCode").value.trim().toUpperCase();
+  if (typedVoucher && (!appliedCheckoutVoucher || appliedCheckoutVoucher.code !== typedVoucher)) {
+    applyCheckoutVoucher(typedVoucher);
+    if (!appliedCheckoutVoucher) {
+      errEl.textContent = $("#voucherStatus").textContent || "Mã voucher chưa hợp lệ";
+      return;
+    }
+  }
   try {
     const res = await apiFetch("/orders/checkout", {
       method: "POST",
-      body: JSON.stringify({ shipping_address, note, payment_method }),
+      body: JSON.stringify({
+        recipient_name,
+        phone,
+        shipping_address,
+        note,
+        payment_method,
+        voucher_code: appliedCheckoutVoucher ? appliedCheckoutVoucher.code : "",
+      }),
     });
     state.cart = [];
+    appliedCheckoutVoucher = null;
     renderCart();
     closeCheckout();
     $("#checkoutForm").reset();

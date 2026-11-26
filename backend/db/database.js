@@ -161,11 +161,20 @@ db.exec(`
     (3, 'NOTE&CO Premium', 'Áp dụng cho đơn từ 499.000đ', 'Giảm 60.000đ', 600);
 `);
 
-// Migration: add payment_method column for existing databases
-try {
-  db.exec("ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cod'");
-} catch {
-  // Column already exists, ignore
+// Migrations for existing databases
+const orderMigrations = [
+  "ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cod'",
+  "ALTER TABLE orders ADD COLUMN recipient_name TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE orders ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE orders ADD COLUMN voucher_code TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE orders ADD COLUMN discount_amount INTEGER NOT NULL DEFAULT 0",
+];
+for (const sql of orderMigrations) {
+  try {
+    db.exec(sql);
+  } catch {
+    // Column already exists, ignore
+  }
 }
 
 const seedProducts = [
