@@ -4,279 +4,13 @@ let products = [];
 let collections = [];
 
 const fallbackProducts = [
-  // --- Bút viết ---
-  {
-    id: 1,
-    name: "Bút gel Sarasa Clip 0.5mm",
-    brand: "ZEBRA",
-    category: "Bút viết",
-    price: 32000,
-    unit: "/ cây",
-    tag: "Bán chạy",
-    color: "visual-blue",
-    image:
-      "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 3,
-    name: "Bộ bút highlight Mildliner",
-    brand: "ZEBRA",
-    category: "Bút viết",
-    price: 125000,
-    unit: "/ bộ 5",
-    tag: "Được yêu thích",
-    color: "visual-green",
-    image:
-      "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 9,
-    name: "Bút bi Uni Jetstream 0.7mm",
-    brand: "UNI",
-    category: "Bút viết",
-    price: 45000,
-    unit: "/ cây",
-    tag: "Bán chạy",
-    color: "visual-peach",
-    image:
-      "https://images.unsplash.com/photo-1585336261022-680e295ce3fe?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 10,
-    name: "Bút máy Lamy Safari",
-    brand: "LAMY",
-    category: "Bút viết",
-    price: 890000,
-    unit: "/ cây",
-    tag: "Premium",
-    color: "visual-purple",
-    image:
-      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 11,
-    name: "Bút lông bảng Pilot",
-    brand: "PILOT",
-    category: "Bút viết",
-    price: 28000,
-    unit: "/ cây",
-    tag: "",
-    color: "visual-blue",
-    image:
-      "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=700&q=80",
-  },
-
-  // --- Giấy & sổ ---
-  {
-    id: 2,
-    name: "Sổ tay Paperways A5",
-    brand: "PAPERWAYS",
-    category: "Giấy & sổ",
-    price: 89000,
-    unit: "/ quyển",
-    tag: "Mới về",
-    color: "visual-pink",
-    image:
-      "https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 4,
-    name: "Giấy note vuông Pastel",
-    brand: "NOTE&CO",
-    category: "Giấy & sổ",
-    price: 24000,
-    unit: "/ xấp",
-    tag: "",
-    color: "visual-yellow",
-    image:
-      "https://images.unsplash.com/photo-1586282391129-76a6df230234?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 12,
-    name: "Sổ Moleskine Classic Large",
-    brand: "MOLESKINE",
-    category: "Giấy & sổ",
-    price: 520000,
-    unit: "/ quyển",
-    tag: "Premium",
-    color: "visual-green",
-    image:
-      "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 13,
-    name: "Giấy in A4 Double A 80gsm",
-    brand: "DOUBLE A",
-    category: "Giấy & sổ",
-    price: 85000,
-    unit: "/ ream",
-    tag: "Giá tốt",
-    color: "visual-white",
-    image:
-      "https://images.unsplash.com/photo-1568702846914-96b305d2uj38?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 14,
-    name: "Sổ Bullet Journal chấm bi",
-    brand: "LEUCHTTURM",
-    category: "Giấy & sổ",
-    price: 380000,
-    unit: "/ quyển",
-    tag: "Mới về",
-    color: "visual-peach",
-    image:
-      "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=700&q=80",
-  },
-
-  // --- Dụng cụ học tập ---
-  {
-    id: 5,
-    name: "Thước kẻ trong 20cm",
-    brand: "THIÊN LONG",
-    category: "Dụng cụ học tập",
-    price: 9000,
-    unit: "/ cây",
-    tag: "Giá tốt",
-    color: "visual-purple",
-    image:
-      "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 15,
-    name: "Compa học sinh inox",
-    brand: "THIÊN LONG",
-    category: "Dụng cụ học tập",
-    price: 35000,
-    unit: "/ chiếc",
-    tag: "",
-    color: "visual-blue",
-    image:
-      "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 16,
-    name: "Hộp bút đa năng Grid",
-    brand: "NOTE&CO",
-    category: "Dụng cụ học tập",
-    price: 65000,
-    unit: "/ chiếc",
-    tag: "Mới về",
-    color: "visual-pink",
-    image:
-      "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 17,
-    name: "Bộ ê-ke thước đo góc",
-    brand: "MAPED",
-    category: "Dụng cụ học tập",
-    price: 42000,
-    unit: "/ bộ",
-    tag: "",
-    color: "visual-yellow",
-    image:
-      "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=700&q=80",
-  },
-
-  // --- Dụng cụ văn phòng ---
-  {
-    id: 6,
-    name: "Bộ kẹp giấy Color Clip",
-    brand: "NOTE&CO",
-    category: "Dụng cụ văn phòng",
-    price: 35000,
-    unit: "/ hộp",
-    tag: "",
-    color: "visual-peach",
-    image:
-      "https://images.unsplash.com/photo-1507925921958-8a62f3d1a50d?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 8,
-    name: "Bìa hồ sơ A4 Pastel",
-    brand: "PLUS",
-    category: "Dụng cụ văn phòng",
-    price: 15000,
-    unit: "/ chiếc",
-    tag: "",
-    color: "visual-white",
-    image:
-      "https://images.unsplash.com/photo-1455885666463-2f1daccb2d1c?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 18,
-    name: "Băng keo washi tape Pastel",
-    brand: "MT",
-    category: "Dụng cụ văn phòng",
-    price: 55000,
-    unit: "/ cuộn",
-    tag: "Được yêu thích",
-    color: "visual-yellow",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 19,
-    name: "Kéo văn phòng Scotch",
-    brand: "3M",
-    category: "Dụng cụ văn phòng",
-    price: 48000,
-    unit: "/ chiếc",
-    tag: "",
-    color: "visual-green",
-    image:
-      "https://images.unsplash.com/photo-1581783898382-80f499f07e44?auto=format&fit=crop&w=700&q=80",
-  },
-
-  // --- Mỹ thuật ---
-  {
-    id: 7,
-    name: "Bút màu nước 12 màu",
-    brand: "MONT MARTE",
-    category: "Mỹ thuật",
-    price: 149000,
-    unit: "/ bộ",
-    tag: "Mới về",
-    color: "visual-blue",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 20,
-    name: "Bảng palette pha màu",
-    brand: "NOTE&CO",
-    category: "Mỹ thuật",
-    price: 28000,
-    unit: "/ chiếc",
-    tag: "",
-    color: "visual-white",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 21,
-    name: "Bộ chì màu Prismacolor 24",
-    brand: "PRISMACOLOR",
-    category: "Mỹ thuật",
-    price: 680000,
-    unit: "/ bộ",
-    tag: "Premium",
-    color: "visual-peach",
-    image:
-      "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    id: 22,
-    name: "Sketchbook A4 160gsm",
-    brand: "CANSON",
-    category: "Mỹ thuật",
-    price: 120000,
-    unit: "/ quyển",
-    tag: "",
-    color: "visual-pink",
-    image:
-      "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=700&q=80",
-  },
+  { id: 1, name: "Bìa sơ mi A4", brand: "DELI", category: "Bìa hồ sơ, lưu trữ tài liệu", price: 18000, unit: "/ xấp 10", tag: "Bán chạy", color: "visual-blue", image: "assets/products/bia-so-mi.webp", description: "Bìa lá sơ mi A4 trong suốt, dày dặn, chống thấm và bảo vệ tài liệu không bị nhàu." },
+  { id: 5, name: "Bút chì bấm Pentel 0.5mm", brand: "PENTEL", category: "Dụng cụ học tập", price: 65000, unit: "/ cây", tag: "Được yêu thích", color: "visual-purple", image: "assets/products/but-chi-bam-pentel.jpg", description: "Bút chì bấm Pentel Nhật Bản, thân cầm chắc tay, cơ chế bấm ngòi mượt và bền bỉ." },
+  { id: 18, name: "Băng keo trong 4,8cm", brand: "NOTE&CO", category: "Dụng cụ văn phòng", price: 22000, unit: "/ cuộn", tag: "Bán chạy", color: "visual-yellow", image: "assets/products/bang-keo-trong-4-8cm.png", description: "Băng keo trong bản rộng 4,8cm dai chắc, bám dính tốt để đóng gói thùng hàng và tài liệu." },
+  { id: 24, name: "Bộ sách Kết Nối Tri Thức Lớp 12", brand: "NXB GIÁO DỤC", category: "Sách giáo khoa", price: 245000, unit: "/ bộ", tag: "Mới về", color: "visual-blue", image: "assets/products/bo-sach-ket-noi-tri-thuc-12.jpg", description: "Trọn bộ sách giáo khoa Kết Nối Tri Thức với cuộc sống lớp 12 theo chương trình GDPT mới." },
+  { id: 31, name: "Harry Potter và Hòn Đá Phù Thủy", brand: "J.K. ROWLING", category: "Sách văn học", price: 150000, unit: "/ quyển", tag: "Được yêu thích", color: "visual-yellow", image: "assets/products/harry-potter-1-hon-da-phu-thuy.webp", description: "Tập 1 mở ra thế giới phép thuật kỳ diệu của trường Hogwarts và hành trình đầu tiên của cậu bé Harry Potter." },
+  { id: 55, name: "Sổ tay A5", brand: "NOTE&CO", category: "Sản phẩm giấy", price: 75000, unit: "/ quyển", tag: "Mới về", color: "visual-peach", image: "assets/products/so-tay-a5.webp", description: "Sổ tay khổ A5 giấy dày 100gsm chống thấm mực, gáy mở phẳng tiện lợi cho ghi chép và bullet journal." },
+  { id: 59, name: "Máy tính cầm tay Flexio", brand: "FLEXIO", category: "Thiết bị", price: 265000, unit: "/ chiếc", tag: "Bán chạy", color: "visual-green", image: "assets/products/may-tinh-flexio.jpg", description: "Máy tính khoa học Flexio màn hình LCD sắc nét, phím bấm nhạy, hỗ trợ đầy đủ tính năng học tập." },
 ];
 
 /* ======== Collections data ======== */
@@ -284,24 +18,24 @@ const fallbackCollections = [
   {
     id: "back-to-school",
     name: "Back to School 2026",
-    desc: "Những món cần thiết cho năm học mới — được chọn kỹ, giá vừa túi.",
-    productIds: [1, 2, 3, 5, 15, 16],
+    desc: "Những món cần thiết cho năm học mới — từ bút viết, vở 200 trang đến bộ sách giáo khoa.",
+    productIds: [5, 6, 12, 15, 24, 56],
     color: "#e0edf3",
     accent: "#4a8db7",
   },
   {
     id: "minimal-desk",
     name: "Minimal Desk Setup",
-    desc: "Gọn gàng, tối giản — bàn làm việc đẹp bắt đầu từ những món nhỏ.",
-    productIds: [4, 6, 8, 12, 18, 19],
+    desc: "Gọn gàng, tối giản — bàn làm việc đẹp bắt đầu từ kệ hồ sơ, sổ tay và dụng cụ văn phòng.",
+    productIds: [2, 3, 19, 22, 54, 55],
     color: "#e9e8dc",
     accent: "#7c8a6e",
   },
   {
     id: "art-studio",
-    name: "Art Studio Essentials",
-    desc: "Dụng cụ mỹ thuật cho người yêu sáng tạo — từ chì màu đến sketchbook.",
-    productIds: [7, 20, 21, 22, 3, 10],
+    name: "Sách hay & Sáng tạo",
+    desc: "Góc đọc sách kinh điển cùng dụng cụ mỹ thuật cho những giờ thư giãn và sáng tạo.",
+    productIds: [7, 10, 11, 31, 41, 43],
     color: "#f5e4e0",
     accent: "#c97856",
   },
@@ -574,6 +308,7 @@ function openQuick(id) {
   $("#quickBrand").textContent = p.brand;
   $("#quickName").textContent = p.name;
   $("#quickPrice").textContent = formatPrice(p.price) + " " + p.unit;
+  $("#quickDescription").textContent = p.description || "Sản phẩm chính hãng tại NOTE&CO, chọn lọc kỹ lưỡng cho học tập và làm việc.";
   $("#quickUnit").textContent = p.unit.replace("/ ", "");
   $("#quickImage").style.backgroundImage = `url(${p.image})`;
   $("#quickImage").className = `quick-image ${p.color}`;

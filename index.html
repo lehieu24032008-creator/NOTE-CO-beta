@@ -113,11 +113,13 @@
           <a class="under-link" href="#products">Xem tất cả <svg class="icon"><use href="#i-arrow" /></svg></a>
         </div>
         <div class="category-grid">
-          <button class="category-card cat-blue" data-category="Bút viết"><span class="cat-visual cat-pen"></span><span><strong>Bút viết</strong><small>24 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
-          <button class="category-card cat-yellow" data-category="Giấy & sổ"><span class="cat-visual cat-notebook"></span><span><strong>Giấy & sổ</strong><small>18 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
-          <button class="category-card cat-lilac" data-category="Dụng cụ học tập"><span class="cat-visual cat-ruler"></span><span><strong>Dụng cụ học tập</strong><small>32 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
-          <button class="category-card cat-peach" data-category="Dụng cụ văn phòng"><span class="cat-visual cat-clip"></span><span><strong>Đồ dùng văn phòng</strong><small>16 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
-          <button class="category-card cat-mint" data-category="Mỹ thuật"><span class="cat-visual cat-brush"></span><span><strong>Mỹ thuật</strong><small>20 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-blue" data-category="Dụng cụ học tập"><span class="cat-visual cat-pen"></span><span><strong>Dụng cụ học tập</strong><small>13 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-yellow" data-category="Sản phẩm giấy"><span class="cat-visual cat-notebook"></span><span><strong>Sản phẩm giấy</strong><small>8 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-lilac" data-category="Sách văn học"><span class="cat-visual cat-ruler"></span><span><strong>Sách văn học</strong><small>22 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-peach" data-category="Dụng cụ văn phòng"><span class="cat-visual cat-clip"></span><span><strong>Dụng cụ văn phòng</strong><small>7 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-mint" data-category="Bìa hồ sơ, lưu trữ tài liệu"><span class="cat-visual cat-brush"></span><span><strong>Bìa hồ sơ, lưu trữ</strong><small>3 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-blue" data-category="Sách giáo khoa"><span class="cat-visual cat-notebook"></span><span><strong>Sách giáo khoa</strong><small>3 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
+          <button class="category-card cat-yellow" data-category="Thiết bị"><span class="cat-visual cat-clip"></span><span><strong>Thiết bị</strong><small>6 sản phẩm</small></span><svg class="icon"><use href="#i-arrow-up" /></svg></button>
         </div>
       </section>
 
@@ -154,11 +156,13 @@
         </div>
         <div class="filter-row">
           <button class="filter-chip is-active" data-filter="Tất cả">Tất cả</button>
-          <button class="filter-chip" data-filter="Bút viết">Bút viết</button>
-          <button class="filter-chip" data-filter="Giấy & sổ">Giấy & sổ</button>
+          <button class="filter-chip" data-filter="Bìa hồ sơ, lưu trữ tài liệu">Bìa hồ sơ, lưu trữ tài liệu</button>
           <button class="filter-chip" data-filter="Dụng cụ học tập">Dụng cụ học tập</button>
-          <button class="filter-chip" data-filter="Dụng cụ văn phòng">Văn phòng</button>
-          <button class="filter-chip" data-filter="Mỹ thuật">Mỹ thuật</button>
+          <button class="filter-chip" data-filter="Dụng cụ văn phòng">Dụng cụ văn phòng</button>
+          <button class="filter-chip" data-filter="Sách giáo khoa">Sách giáo khoa</button>
+          <button class="filter-chip" data-filter="Sách văn học">Sách văn học</button>
+          <button class="filter-chip" data-filter="Sản phẩm giấy">Sản phẩm giấy</button>
+          <button class="filter-chip" data-filter="Thiết bị">Thiết bị</button>
         </div>
         <div class="products-grid" id="productsGrid"></div>
         <div class="empty-state" id="emptyState">
@@ -223,7 +227,7 @@
         <div>
           <strong>Khám phá</strong>
           <a href="#products">Sản phẩm mới</a>
-          <a href="#products">Bút viết</a>
+          <a href="#products">Sách văn học</a>
           <a href="#combo">Combo tiết kiệm</a>
         </div>
         <div>
@@ -561,7 +565,7 @@
           <h2 id="quickName"></h2>
           <div class="quick-rating">★★★★★ <span>4.9 · 86 đánh giá</span></div>
           <p class="quick-price" id="quickPrice"></p>
-          <p class="quick-description">Một lựa chọn gọn gàng cho bàn học và góc làm việc. Thiết kế tiện dụng, màu sắc dễ phối và phù hợp để dùng mỗi ngày.</p>
+          <p class="quick-description" id="quickDescription">Một lựa chọn gọn gàng cho bàn học và góc làm việc. Thiết kế tiện dụng, màu sắc dễ phối và phù hợp để dùng mỗi ngày.</p>
           <div class="quick-spec"><span>Quy cách</span><strong id="quickUnit"></strong></div>
           <p class="quick-stock" id="quickStock"></p>
           <div class="quick-qty">
